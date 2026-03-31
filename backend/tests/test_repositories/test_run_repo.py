@@ -6,7 +6,7 @@ from __future__ import annotations
 import pytest
 
 from app.models.run import MeridianConfig, RunRecord, RunStatus
-from app.models.upload import UploadRecord, WeeksRange
+from app.models.upload import UploadRecord, DateRange
 from app.models.results import ModelDiagnostics, ResponseCurveData, RunResults
 
 
@@ -22,7 +22,7 @@ def _make_upload(session_id: str = "sess-1") -> tuple[UploadRecord, bytes]:
         session_id=session_id,
         filename="test.csv",
         rows=52,
-        weeks_range=WeeksRange(start="2024-01-01", end="2024-12-30"),
+        date_range=DateRange(start="2024-01-01", end="2024-12-30"), granularity="weekly",
         channels=["tv", "search"],
         channel_count=2,
         total_spend_per_channel={"tv": 100000.0, "search": 50000.0},

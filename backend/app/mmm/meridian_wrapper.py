@@ -43,14 +43,16 @@ def _import_meridian():
         ) from exc
 
 
-def _build_input_data(df: pd.DataFrame, channel_names: list[str]):
+def _build_input_data(df: pd.DataFrame, channel_names: list[str], granularity: str = "weekly"):
     """
     Convert a tidy DataFrame into a Meridian InputData object.
 
     DataFrame columns expected:
-        week           — ISO date string (YYYY-MM-DD)
-        <channel_n>    — weekly spend per channel (float)
-        acquisitions   — weekly KPI count (float)
+        date           — ISO date string (YYYY-MM-DD), any granularity
+        <channel_n>    — spend per period per channel (float)
+        acquisitions   — KPI count per period (float)
+
+    granularity: 'daily' | 'weekly' | 'monthly'
 
     Returns a meridian.data.InputData instance.
     """
@@ -61,7 +63,9 @@ def _build_input_data(df: pd.DataFrame, channel_names: list[str]):
     n_times = len(df)
     n_channels = len(channel_names)
 
-    time_coords = df["week"].tolist()
+    # Support both old 'week' and new normalised 'date' column name
+    date_col = "date" if "date" in df.columns else "week"
+    time_coords = df[date_col].tolist()
 
     # KPI: (n_geos=1, n_times) — name must match what Meridian expects
     kpi_values = df["acquisitions"].to_numpy(dtype=float).reshape(1, n_times)
@@ -176,6 +180,7 @@ class MeridianWrapper:
         self,
         df: pd.DataFrame,
         channel_names: list[str],
+        granularity: str = "weekly",
         progress_callback: Callable[[int], None] | None = None,
     ) -> FitResult:
         """
@@ -194,7 +199,7 @@ class MeridianWrapper:
         logger.info(
             "Building InputData: %d weeks, %d channels", len(df), len(channel_names)
         )
-        input_data = _build_input_data(df, channel_names)
+        input_data = _build_input_data(df, channel_names, granularity=granularity)
 
         if progress_callback:
             progress_callback(10)

@@ -104,6 +104,7 @@ async def create_run(
         "upload_id": body.upload_id,
         "channel_names": channel_names,
         "total_budget": body.total_budget,
+        "granularity": upload.granularity,
         "channel_constraints": {
             ch: c.model_dump() for ch, c in body.channel_constraints.items()
         },

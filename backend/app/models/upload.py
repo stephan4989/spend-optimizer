@@ -8,7 +8,7 @@ def _new_uuid() -> str:
     return str(uuid.uuid4())
 
 
-class WeeksRange(BaseModel):
+class DateRange(BaseModel):
     start: str  # ISO date "YYYY-MM-DD"
     end: str
 
@@ -22,11 +22,11 @@ class UploadRecord(BaseModel):
     session_id: str
     filename: str
     rows: int
-    weeks_range: WeeksRange
+    date_range: DateRange
+    granularity: str          # 'daily' | 'weekly' | 'monthly'
     channels: list[str]
     channel_count: int
     total_spend_per_channel: dict[str, float]
-    # Redis key where raw CSV bytes live
     raw_csv_key: str
 
 
@@ -38,7 +38,8 @@ class UploadResponse(BaseModel):
     upload_id: str
     filename: str
     rows: int
-    weeks_range: WeeksRange
+    date_range: DateRange
+    granularity: str          # 'daily' | 'weekly' | 'monthly'
     channels: list[str]
     channel_count: int
     total_spend_per_channel: dict[str, float]

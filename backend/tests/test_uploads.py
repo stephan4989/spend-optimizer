@@ -74,7 +74,7 @@ async def test_upload_valid_csv(session_repo, upload_repo, run_repo):
     assert body["rows"] == 52
     assert set(body["channels"]) == {"tv", "paid_search", "social"}
     assert body["channel_count"] == 3
-    assert body["weeks_range"]["start"] == "2024-01-01"
+    assert body["date_range"]["start"] == "2024-01-01"
     for ch in ["tv", "paid_search", "social"]:
         assert body["total_spend_per_channel"][ch] == 520000.0
 

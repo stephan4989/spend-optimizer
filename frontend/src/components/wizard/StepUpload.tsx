@@ -29,21 +29,25 @@ function validateAndPreview(_file: File, text: string): ParsedPreview {
   const rows = result.data.map((row) => headers.map((h) => row[h] ?? ''))
   const totalRows = rows.length
 
-  const REQUIRED = ['week', 'acquisitions']
-  const missing = REQUIRED.filter((c) => !headers.includes(c))
-  if (missing.length > 0) {
+  const DATE_ALIASES = ['date', 'week', 'month']
+  const dateCol = DATE_ALIASES.find((c) => headers.includes(c))
+  if (!dateCol || !headers.includes('acquisitions')) {
+    const missing = []
+    if (!dateCol) missing.push("'date', 'week', or 'month'")
+    if (!headers.includes('acquisitions')) missing.push("'acquisitions'")
     return { headers, rows, totalRows, channels: [], validationError: `Missing required column(s): ${missing.join(', ')}` }
   }
 
-  const channels = headers.filter((h) => h !== 'week' && h !== 'acquisitions')
+  const reserved = new Set([...DATE_ALIASES, 'acquisitions'])
+  const channels = headers.filter((h) => !reserved.has(h))
   if (channels.length === 0) {
     return { headers, rows, totalRows, channels, validationError: 'No channel columns found. Add at least one spend column.' }
   }
   if (channels.length > 10) {
     return { headers, rows, totalRows, channels, validationError: `Too many channels (${channels.length}). Maximum is 10.` }
   }
-  if (totalRows < 13) {
-    return { headers, rows, totalRows, channels, validationError: `Not enough data rows (${totalRows}). Minimum is 13 weeks.` }
+  if (totalRows < 6) {
+    return { headers, rows, totalRows, channels, validationError: `Not enough data rows (${totalRows}). Minimum is 6 rows.` }
   }
 
   return { headers, rows, totalRows, channels, validationError: null }
@@ -108,7 +112,7 @@ export function StepUpload({ onComplete }: Props) {
               </svg>
               <div>
                 <p className="text-sm font-medium text-gray-900">{file?.name}</p>
-                <p className="text-xs text-gray-500">{preview.totalRows} weeks · {preview.channels.length} channels detected</p>
+                <p className="text-xs text-gray-500">{preview.totalRows} rows · {preview.channels.length} channels detected</p>
               </div>
             </div>
             <button onClick={() => { setFile(null); setPreview(null) }} className="text-xs text-gray-400 hover:text-gray-600">

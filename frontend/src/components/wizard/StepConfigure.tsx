@@ -120,7 +120,7 @@ export function StepConfigure({ upload, onComplete }: Props) {
         {/* Upload summary */}
         <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500">
           <span className="font-medium text-gray-700">{upload.filename}</span>
-          {' · '}{upload.rows} weeks · {upload.weeks_range.start} → {upload.weeks_range.end}
+          {' · '}{upload.rows} rows · {upload.granularity} · {upload.date_range.start} → {upload.date_range.end}
         </div>
 
         {/* Total budget */}

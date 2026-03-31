@@ -34,6 +34,7 @@ def fit_model(self, payload: dict) -> None:
     total_budget: float = payload["total_budget"]
     channel_constraints_raw: dict = payload.get("channel_constraints", {})
     meridian_config_raw: dict = payload.get("meridian_config", {})
+    granularity: str = payload.get("granularity", "weekly")
 
     import redis as sync_redis
     from app.config import get_settings
@@ -67,6 +68,7 @@ def fit_model(self, payload: dict) -> None:
         fit_result = wrapper.fit(
             df=df,
             channel_names=channel_names,
+            granularity=granularity,
             progress_callback=lambda pct: progress(10 + int(pct * 0.7)),
         )
         logger.info("fit_model[%s]: model fitted. r_hat_max=%.3f", run_id, fit_result.r_hat_max)
