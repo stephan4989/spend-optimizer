@@ -136,9 +136,9 @@ def _extract_posterior(mmm, channel_names: list[str]) -> PosteriorSamples:
         shape = arr.shape
         return arr.reshape(shape[0] * shape[1], *shape[2:])
 
-    alpha = flat("alpha")                   # (n_samples, n_channels)
-    ec = flat("ec")                         # (n_samples, n_channels)
-    slope = flat("slope")                   # (n_samples, n_channels)
+    alpha = flat("alpha_m")                 # (n_samples, n_channels)
+    ec = flat("ec_m")                       # (n_samples, n_channels)
+    slope = flat("slope_m")                 # (n_samples, n_channels)
     beta_gm = flat("beta_gm")              # (n_samples, n_geos, n_channels)
     beta = beta_gm[:, 0, :]                # take geo=0 (national) → (n_samples, n_channels)
 
@@ -158,7 +158,7 @@ def _compute_diagnostics(mmm) -> tuple[float, int]:
     """
     try:
         import arviz as az
-        summary = az.summary(mmm.inference_data, var_names=["alpha", "ec", "slope", "beta_gm"])
+        summary = az.summary(mmm.inference_data, var_names=["alpha_m", "ec_m", "slope_m", "beta_gm"])
         r_hat_max = float(summary["r_hat"].max())
         ess_bulk_min = int(summary["ess_bulk"].min())
         return r_hat_max, ess_bulk_min
