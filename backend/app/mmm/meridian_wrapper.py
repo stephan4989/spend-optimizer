@@ -72,15 +72,16 @@ def _build_input_data(df: pd.DataFrame, channel_names: list[str]):
         coords={"geo": ["national"], "time": time_coords},
     )
 
-    # Media spend: (n_geos=1, n_times, n_channels)
+    # Media spend: (n_geos=1, n_media_times, n_channels)
+    # Meridian requires the time dim to be named 'media_time' for media arrays
     spend_values = df[channel_names].to_numpy(dtype=float).reshape(1, n_times, n_channels)
     media = xr.DataArray(
         spend_values,
         name="media",
-        dims=["geo", "time", "media_channel"],
+        dims=["geo", "media_time", "media_channel"],
         coords={
             "geo": ["national"],
-            "time": time_coords,
+            "media_time": time_coords,
             "media_channel": channel_names,
         },
     )
@@ -88,10 +89,10 @@ def _build_input_data(df: pd.DataFrame, channel_names: list[str]):
     media_spend = xr.DataArray(
         spend_values,
         name="media_spend",
-        dims=["geo", "time", "media_channel"],
+        dims=["geo", "media_time", "media_channel"],
         coords={
             "geo": ["national"],
-            "time": time_coords,
+            "media_time": time_coords,
             "media_channel": channel_names,
         },
     )
