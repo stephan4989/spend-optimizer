@@ -133,7 +133,6 @@ export function StepConfigure({ upload, onComplete }: Props) {
             <input
               type="number"
               min="1"
-              step="1000"
               value={totalBudget}
               onChange={(e) => setTotalBudget(e.target.value)}
               className="w-full rounded-lg border border-gray-300 pl-7 pr-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
