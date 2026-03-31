@@ -15,11 +15,20 @@ client.interceptors.request.use((config) => {
   return config
 })
 
-// Surface error detail from the API as a plain Error message
+// Surface error detail from the API as a plain Error message.
+// Also detect server-side session expiry (404 "Session not found or expired.")
+// and mark it in the store so the UI can prompt re-initialisation.
 client.interceptors.response.use(
   (res) => res,
   (err) => {
     const detail = err?.response?.data?.detail
+    if (
+      err?.response?.status === 404 &&
+      typeof detail === 'string' &&
+      detail.toLowerCase().includes('session not found')
+    ) {
+      useSessionStore.getState().markServerExpired()
+    }
     if (detail) {
       return Promise.reject(new Error(typeof detail === 'string' ? detail : JSON.stringify(detail)))
     }

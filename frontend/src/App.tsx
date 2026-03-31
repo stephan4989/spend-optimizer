@@ -1,11 +1,36 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { useSession } from '@/hooks/useSession'
+import { useSessionStore } from '@/store/sessionStore'
 import { RunsSidebar } from '@/components/runs/RunsSidebar'
+import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 import { HomePage } from '@/pages/HomePage'
 import { RunPage } from '@/pages/RunPage'
+import { NewRunPage } from '@/pages/NewRunPage'
 
 function SessionGate({ children }: { children: React.ReactNode }) {
   const { ready, error } = useSession()
+  const serverExpired = useSessionStore((s) => s.serverExpired)
+
+  // Server-side TTL expiry: session was purged from Redis while the tab was open.
+  // Reloading triggers useSession to create a fresh session automatically.
+  if (serverExpired) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center max-w-md">
+          <p className="font-semibold text-amber-800">Your session has expired</p>
+          <p className="mt-1 text-sm text-amber-600">
+            Sessions last 4 hours. Your data has been cleared — start a new run to continue.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 rounded bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700"
+          >
+            Start fresh
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   if (error) {
     return (
@@ -48,10 +73,13 @@ export default function App() {
 
           {/* Main content area */}
           <main className="flex-1 overflow-y-auto">
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/runs/:runId" element={<RunPage />} />
-            </Routes>
+            <ErrorBoundary>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/new" element={<NewRunPage />} />
+                <Route path="/runs/:runId" element={<RunPage />} />
+              </Routes>
+            </ErrorBoundary>
           </main>
         </div>
       </SessionGate>

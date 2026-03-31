@@ -1,0 +1,71 @@
+version: "3.9"
+
+# Production profile — no volume mounts, no hot reload, nginx serves the frontend.
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml up --build -d
+#
+# Environment:
+#   Copy backend/.env.example to backend/.env and fill in values before running.
+#   Set CORS_ORIGINS to the public domain (e.g. https://spend-optimizer.example.com).
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru --save ""
+    # Redis port is NOT exposed externally in production
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    # Multiple uvicorn workers; no --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - LOG_FORMAT=json
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=1
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - LOG_FORMAT=json
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 8g
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      api:
+        condition: service_healthy

@@ -21,7 +21,7 @@ export function HomePage() {
         </p>
 
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/new')}
           className="mt-8 inline-flex items-center gap-2 rounded-lg bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
