@@ -89,10 +89,10 @@ def _build_input_data(df: pd.DataFrame, channel_names: list[str]):
     media_spend = xr.DataArray(
         spend_values,
         name="media_spend",
-        dims=["geo", "media_time", "media_channel"],
+        dims=["geo", "time", "media_channel"],
         coords={
             "geo": ["national"],
-            "media_time": time_coords,
+            "time": time_coords,
             "media_channel": channel_names,
         },
     )
