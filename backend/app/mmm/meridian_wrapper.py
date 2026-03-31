@@ -63,10 +63,11 @@ def _build_input_data(df: pd.DataFrame, channel_names: list[str]):
 
     time_coords = df["week"].tolist()
 
-    # KPI: (n_geos=1, n_times)
+    # KPI: (n_geos=1, n_times) — name must match what Meridian expects
     kpi_values = df["acquisitions"].to_numpy(dtype=float).reshape(1, n_times)
     kpi = xr.DataArray(
         kpi_values,
+        name="kpi",
         dims=["geo", "time"],
         coords={"geo": ["national"], "time": time_coords},
     )
@@ -75,6 +76,18 @@ def _build_input_data(df: pd.DataFrame, channel_names: list[str]):
     spend_values = df[channel_names].to_numpy(dtype=float).reshape(1, n_times, n_channels)
     media = xr.DataArray(
         spend_values,
+        name="media",
+        dims=["geo", "time", "media_channel"],
+        coords={
+            "geo": ["national"],
+            "time": time_coords,
+            "media_channel": channel_names,
+        },
+    )
+
+    media_spend = xr.DataArray(
+        spend_values,
+        name="media_spend",
         dims=["geo", "time", "media_channel"],
         coords={
             "geo": ["national"],
@@ -86,6 +99,7 @@ def _build_input_data(df: pd.DataFrame, channel_names: list[str]):
     # Population: constant 1.0 for a national model
     population = xr.DataArray(
         np.ones((1,), dtype=float),
+        name="population",
         dims=["geo"],
         coords={"geo": ["national"]},
     )
@@ -94,7 +108,7 @@ def _build_input_data(df: pd.DataFrame, channel_names: list[str]):
         kpi=kpi,
         kpi_type="non_revenue",
         media=media,
-        media_spend=media,   # spend = media proxy (impressions not available)
+        media_spend=media_spend,
         population=population,
     )
 
