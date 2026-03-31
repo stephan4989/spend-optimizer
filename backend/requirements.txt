@@ -1,0 +1,34 @@
+# Web
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+python-multipart==0.0.9
+
+# Settings
+pydantic-settings==2.2.1
+
+# Redis + async
+redis[hiredis]==5.0.4
+aioredis==2.0.1
+
+# Celery
+celery==5.3.6
+
+# Data
+pandas==2.2.2
+numpy==1.26.4
+scipy==1.13.0
+
+# MMM — Linux/Docker only (requires Python 3.10+ and TensorFlow 2.19+)
+# Install inside Docker: pip install git+https://github.com/google/meridian.git
+# google-meridian is NOT on PyPI; install from GitHub in the Dockerfile
+
+# HTTP validation
+httpx==0.27.0
+
+# Python 3.9 compatibility with Pydantic v2 union syntax
+eval_type_backport==0.2.0
+
+# Testing
+pytest==8.2.0
+pytest-asyncio==0.23.6
+fakeredis==2.23.0
