@@ -1,3 +1,4 @@
+import os
 from celery import Celery
 
 from app.config import get_settings
@@ -7,11 +8,14 @@ configure_logging()
 
 settings = get_settings()
 
+# Use mock task when MOCK_MMM=1 (no Meridian/Linux required — for local demo)
+_task_module = "app.tasks.fit_model_mock" if os.getenv("MOCK_MMM") == "1" else "app.tasks.fit_model"
+
 celery_app = Celery(
     "spend_optimizer",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
-    include=["app.tasks.fit_model"],
+    include=[_task_module],
 )
 
 celery_app.conf.update(

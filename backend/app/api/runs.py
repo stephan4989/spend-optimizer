@@ -29,8 +29,13 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 def _dispatch_fit_model(payload: dict) -> str:
-    """Enqueue the fit_model Celery task. Returns the Celery task ID."""
-    from app.tasks.fit_model import fit_model
+    """Enqueue the fit_model Celery task. Returns the Celery task ID.
+    Set MOCK_MMM=1 to use the mock task (no Meridian/Linux required)."""
+    import os
+    if os.getenv("MOCK_MMM") == "1":
+        from app.tasks.fit_model_mock import fit_model
+    else:
+        from app.tasks.fit_model import fit_model
     result = fit_model.delay(payload)
     return result.id
 
