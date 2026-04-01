@@ -51,7 +51,12 @@ export function StepConfigure({ upload, onComplete }: Props) {
   // Mean spend per data period (week / day / month)
   const meanPeriodSpend = Object.values(upload.total_spend_per_channel).reduce((a, b) => a + b, 0) / upload.rows
 
-  const [runLabel, setRunLabel] = useState('')
+  const defaultRunLabel = (() => {
+    const base = upload.filename.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim()
+    const period = (PERIOD_OPTIONS[upload.granularity] ?? PERIOD_OPTIONS.weekly)[defaultPeriodIdx].label
+    return `${base} – ${period}`
+  })()
+  const [runLabel, setRunLabel] = useState(defaultRunLabel)
   const [periodIdx, setPeriodIdx] = useState(defaultPeriodIdx)
   const [totalBudget, setTotalBudget] = useState<string>(() => {
     // Default: mean per-period spend × periods in default planning window
