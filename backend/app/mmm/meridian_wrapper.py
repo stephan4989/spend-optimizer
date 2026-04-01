@@ -151,11 +151,11 @@ def _build_input_data(
         controls = xr.DataArray(
             trend_values.reshape(1, n_times, 1),
             name="controls",
-            dims=["geo", "time", "control"],
+            dims=["geo", "time", "control_variable"],
             coords={
                 "geo": ["national"],
                 "time": time_coords,
-                "control": ["trend"],
+                "control_variable": ["trend"],
             },
         )
         control_names = ["trend"]
