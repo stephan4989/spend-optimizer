@@ -3,6 +3,7 @@ import type { RunSummary } from '@/types/run'
 import { RunStatusBadge } from '@/components/runs/RunStatusBadge'
 import { ResponseCurveChart } from '@/components/charts/ResponseCurveChart'
 import { BudgetAllocationChart } from '@/components/charts/BudgetAllocationChart'
+import { ScenarioPanel } from '@/components/wizard/ScenarioPanel'
 
 interface Props {
   run: RunSummary
@@ -146,6 +147,9 @@ export function StepResults({ run, results }: Props) {
           <BudgetAllocationChart results={results} />
         </div>
       </div>
+
+      {/* Budget scenario */}
+      <ScenarioPanel run_id={results.run_id} results={results} />
 
       {/* Model diagnostics */}
       <div>

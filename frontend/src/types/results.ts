@@ -11,6 +11,14 @@ export interface ModelDiagnostics {
   waic: number | null
 }
 
+export interface ScenarioResult {
+  total_budget: number
+  optimized_allocation: Record<string, number>
+  optimized_total_acquisitions: number
+  prior_total_acquisitions: number
+  lift_pct: number
+}
+
 export interface RunResults {
   run_id: string
   run_label: string
