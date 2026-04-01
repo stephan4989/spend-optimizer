@@ -34,6 +34,7 @@ class MeridianConfig(BaseModel):
     n_samples: int = 1000
     roi_mu: float | None = None
     roi_sigma: float | None = None
+    enable_aks: bool = False   # Automatic Knot Selection — fits spline over time to capture seasonality
 
 
 # ---------------------------------------------------------------------------

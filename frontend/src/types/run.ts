@@ -9,6 +9,7 @@ export interface MeridianConfig {
   n_chains: number
   n_warmup: number
   n_samples: number
+  enable_aks: boolean
   roi_mu: number | null
   roi_sigma: number | null
 }
@@ -56,6 +57,7 @@ export const DEFAULT_MERIDIAN_CONFIG: MeridianConfig = {
   n_chains: 1,
   n_warmup: 500,
   n_samples: 100,
+  enable_aks: false,
   roi_mu: null,
   roi_sigma: null,
 }

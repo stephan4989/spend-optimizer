@@ -317,24 +317,38 @@ export function StepConfigure({ upload, onComplete }: Props) {
             </svg>
           </button>
           {showAdvanced && (
-            <div className="border-t border-gray-200 px-4 py-4 grid grid-cols-3 gap-4">
-              {([
-                { key: 'n_chains', label: 'Chains', min: 1, max: 8 },
-                { key: 'n_warmup', label: 'Warmup steps', min: 100, max: 2000 },
-                { key: 'n_samples', label: 'Samples', min: 100, max: 4000 },
-              ] as const).map(({ key, label, min, max }) => (
-                <div key={key}>
-                  <label className="text-xs text-gray-500">{label}</label>
-                  <input
-                    type="number"
-                    min={min}
-                    max={max}
-                    value={meridianConfig[key]}
-                    onChange={(e) => setMeridianConfig((c) => ({ ...c, [key]: parseInt(e.target.value) || c[key] }))}
-                    className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-xs focus:border-brand-500 focus:outline-none"
-                  />
+            <div className="border-t border-gray-200 px-4 py-4 space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                {([
+                  { key: 'n_chains', label: 'Chains', min: 1, max: 8 },
+                  { key: 'n_warmup', label: 'Warmup steps', min: 100, max: 2000 },
+                  { key: 'n_samples', label: 'Samples', min: 100, max: 4000 },
+                ] as const).map(({ key, label, min, max }) => (
+                  <div key={key}>
+                    <label className="text-xs text-gray-500">{label}</label>
+                    <input
+                      type="number"
+                      min={min}
+                      max={max}
+                      value={meridianConfig[key]}
+                      onChange={(e) => setMeridianConfig((c) => ({ ...c, [key]: parseInt(e.target.value) || c[key] }))}
+                      className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-xs focus:border-brand-500 focus:outline-none"
+                    />
+                  </div>
+                ))}
+              </div>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={meridianConfig.enable_aks}
+                  onChange={(e) => setMeridianConfig((c) => ({ ...c, enable_aks: e.target.checked }))}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-brand-600"
+                />
+                <div>
+                  <p className="text-xs font-medium text-gray-700">Seasonality (AKS)</p>
+                  <p className="text-xs text-gray-400">Fits a piecewise spline over time to capture seasonal patterns. Increases fit time and memory usage.</p>
                 </div>
-              ))}
+              </label>
             </div>
           )}
         </div>

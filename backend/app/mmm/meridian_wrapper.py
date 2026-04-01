@@ -306,7 +306,25 @@ class MeridianWrapper:
             self.config.n_warmup,
             self.config.n_samples,
         )
-        mmm = model_lib.Meridian(input_data=input_data)
+        # Build ModelConfig — enable AKS (Automatic Knot Selection) if requested.
+        # AKS fits a piecewise linear spline over time to capture seasonal patterns
+        # without needing extra CSV columns. Adds parameters → slightly longer fit.
+        try:
+            from meridian.model import model_config as mc_lib
+            model_cfg_kwargs = {}
+            if self.config.enable_aks:
+                model_cfg_kwargs["enable_aks"] = True
+                logger.info("fit_model: AKS seasonality enabled")
+            model_cfg = mc_lib.ModelConfig(**model_cfg_kwargs) if model_cfg_kwargs else None
+        except Exception as exc:
+            logger.warning("Could not build ModelConfig (%s) — using defaults", exc)
+            model_cfg = None
+
+        mmm_kwargs = {"input_data": input_data}
+        if model_cfg is not None:
+            mmm_kwargs["model_config"] = model_cfg
+
+        mmm = model_lib.Meridian(**mmm_kwargs)
         mmm.sample_posterior(
             n_chains=self.config.n_chains,
             n_adapt=self.config.n_warmup,
