@@ -5,6 +5,7 @@ import { ResponseCurveChart } from '@/components/charts/ResponseCurveChart'
 import { BudgetAllocationChart } from '@/components/charts/BudgetAllocationChart'
 import { ModelFitChart } from '@/components/charts/ModelFitChart'
 import { ContributionChart } from '@/components/charts/ContributionChart'
+import { MarginalCPAChart } from '@/components/charts/MarginalCPAChart'
 import { MetricTooltip } from '@/components/common/MetricTooltip'
 import { ScenarioPanel } from '@/components/wizard/ScenarioPanel'
 
@@ -191,6 +192,18 @@ export function StepResults({ run, results }: Props) {
         <p className="mb-3 text-xs text-gray-400">Diminishing returns — how each channel converts spend to acquisitions</p>
         <div className="rounded-xl border border-gray-200 bg-white p-4">
           <ResponseCurveChart results={results} />
+        </div>
+      </div>
+
+      {/* ── 4. Marginal CPA ───────────────────────────────────────────── */}
+      <div>
+        <h3 className="mb-1 flex items-center text-sm font-semibold text-gray-800">
+          Marginal CPA by channel
+          <MetricTooltip text="Marginal CPA = ΔSpend / ΔAcquisitions between consecutive points on the response curve. It shows the cost of acquiring the next customer as you increase spend. A rising curve means diminishing returns — each additional dollar buys fewer acquisitions. The optimal budget splits spend across channels until their marginal CPAs are equal (the Lagrangian condition the optimizer solves)." />
+        </h3>
+        <p className="mb-3 text-xs text-gray-400">Cost of the next acquisition as spend increases — where efficiency breaks down</p>
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <MarginalCPAChart results={results} />
         </div>
       </div>
 
