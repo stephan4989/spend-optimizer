@@ -116,7 +116,7 @@ export function ContributionChart({ data, channels }: Props) {
         useResizeHandler
       />
       <p className="text-center text-xs text-gray-400 -mt-2">
-        Baseline = organic, trend &amp; seasonality · Media contributions use time-series adstock
+        Baseline = intercept + trend (acquisitions with zero media spend) · Media uses time-series adstock
       </p>
     </div>
   )

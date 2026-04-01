@@ -157,9 +157,9 @@ export function StepResults({ run, results }: Props) {
       <div>
         <h3 className="mb-1 flex items-center text-sm font-semibold text-gray-800">
           Model fit — actual vs predicted
-          <MetricTooltip text="'Predicted' is the posterior mean of total media-attributed acquisitions (Hill-Adstock contributions across all channels). The gap between predicted and actual is the baseline — acquisitions driven by organic traffic, trend, and seasonality. The shaded band is the 80% credible interval across posterior samples." />
+          <MetricTooltip text="Predicted is the full in-sample model prediction: ŷ = tau_g + mu_t + Σ(beta_m × Hill(Adstock(x_m))) + gamma_c × trend. It should track actual closely if the model fits well. The shaded band is the 80% credible interval across posterior samples. Large gaps indicate missing drivers (seasonality, promotions)." />
         </h3>
-        <p className="mb-3 text-xs text-gray-400">Media-attributed acquisitions vs actual — gap between lines is baseline (organic, trend, seasonality)</p>
+        <p className="mb-3 text-xs text-gray-400">Full model prediction (intercept + trend + media) vs observed KPI</p>
         <div className="rounded-xl border border-gray-200 bg-white p-4">
           {results.model_fit
             ? <ModelFitChart data={results.model_fit} />
@@ -172,7 +172,7 @@ export function StepResults({ run, results }: Props) {
       <div>
         <h3 className="mb-1 flex items-center text-sm font-semibold text-gray-800">
           Channel contribution breakdown
-          <MetricTooltip text="Media-attributed acquisitions per channel per period, computed using time-series geometric adstock. Each channel's contribution is the Hill-saturation output scaled by its posterior beta coefficient. The baseline (organic traffic, seasonality, trend) is excluded — contributions shown here are the marginal effect of paid media spend." />
+          <MetricTooltip text="Per-channel media contributions computed using time-series adstock: contrib_m = beta_m × Hill(Adstock(x_m)). Baseline = ŷ(full model) − Σ(media contributions) = tau_g + mu_t + gamma_c × trend, i.e. acquisitions if all media spend were zero. Stacked area always sums to the full model prediction." />
         </h3>
         <p className="mb-3 text-xs text-gray-400">Acquisitions attributed to each channel over time</p>
         <div className="rounded-xl border border-gray-200 bg-white p-4">
