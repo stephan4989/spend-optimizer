@@ -17,16 +17,46 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value)
 }
 
+// Planning period options per data granularity.
+// `periods` = number of data rows (weeks/days/months) in that planning window.
+const PERIOD_OPTIONS: Record<string, { label: string; periods: number }[]> = {
+  daily:   [
+    { label: 'Weekly',    periods: 7   },
+    { label: 'Monthly',   periods: 30  },
+    { label: 'Quarterly', periods: 91  },
+    { label: 'Annual',    periods: 365 },
+  ],
+  weekly:  [
+    { label: 'Monthly',   periods: 4  },
+    { label: 'Quarterly', periods: 13 },
+    { label: 'Annual',    periods: 52 },
+  ],
+  monthly: [
+    { label: 'Quarterly', periods: 3  },
+    { label: 'Annual',    periods: 12 },
+  ],
+}
+
+// Default planning period index per granularity (quarterly for daily/weekly, annual for monthly)
+const DEFAULT_PERIOD_IDX: Record<string, number> = { daily: 2, weekly: 1, monthly: 1 }
+
 export function StepConfigure({ upload, onComplete }: Props) {
   const sessionId = useSessionStore((s) => s.sessionId)!
   const { upsertRun } = useRunsStore()
   const navigate = useNavigate()
 
+  const periodOptions = PERIOD_OPTIONS[upload.granularity] ?? PERIOD_OPTIONS.weekly
+  const defaultPeriodIdx = DEFAULT_PERIOD_IDX[upload.granularity] ?? 1
+
+  // Mean spend per data period (week / day / month)
+  const meanPeriodSpend = Object.values(upload.total_spend_per_channel).reduce((a, b) => a + b, 0) / upload.rows
+
   const [runLabel, setRunLabel] = useState('')
+  const [periodIdx, setPeriodIdx] = useState(defaultPeriodIdx)
   const [totalBudget, setTotalBudget] = useState<string>(() => {
-    // Default: sum of historical spend per channel
-    const total = Object.values(upload.total_spend_per_channel).reduce((a, b) => a + b, 0)
-    return Math.round(total).toString()
+    // Default: mean per-period spend × periods in default planning window
+    const nPeriods = (PERIOD_OPTIONS[upload.granularity] ?? PERIOD_OPTIONS.weekly)[defaultPeriodIdx].periods
+    return Math.round(meanPeriodSpend * nPeriods).toString()
   })
   const [selectedChannels, setSelectedChannels] = useState<string[]>(upload.channels)
   const [constraints, setConstraints] = useState<Record<string, ChannelConstraint>>(() =>
@@ -59,10 +89,14 @@ export function StepConfigure({ upload, onComplete }: Props) {
     setSubmitting(true)
     setError(null)
     try {
+      // Send per-period budget to the optimizer — response curves are in per-period units
+      const nPeriods = periodOptions[periodIdx].periods
+      const perPeriodBudget = budget / nPeriods
+
       const run = await createRun(sessionId, {
         upload_id: upload.upload_id,
         run_label: runLabel.trim(),
-        total_budget: budget,
+        total_budget: perPeriodBudget,
         channel_names: selectedChannels,
         channel_constraints: Object.fromEntries(
           selectedChannels.map((ch) => [ch, constraints[ch] ?? { min_fraction: 0, max_fraction: 1 }])
@@ -135,24 +169,56 @@ export function StepConfigure({ upload, onComplete }: Props) {
           {' · '}{upload.rows} rows · {upload.granularity} · {upload.date_range.start} → {upload.date_range.end}
         </div>
 
-        {/* Total budget */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Optimisation budget <span className="text-red-500">*</span>
-          </label>
-          <div className="relative">
-            <span className="absolute inset-y-0 left-3 flex items-center text-gray-400 text-sm">$</span>
-            <input
-              type="number"
-              min="1"
-              value={totalBudget}
-              onChange={(e) => setTotalBudget(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 pl-7 pr-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-            />
+        {/* Planning period + budget */}
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Planning period <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-2">
+              {periodOptions.map((opt, idx) => (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => {
+                    // Recalculate default budget for new period
+                    setTotalBudget(Math.round(meanPeriodSpend * opt.periods).toString())
+                    setPeriodIdx(idx)
+                  }}
+                  className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                    periodIdx === idx
+                      ? 'bg-brand-600 border-brand-600 text-white'
+                      : 'bg-white border-gray-300 text-gray-600 hover:border-brand-400'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <p className="mt-1 text-xs text-gray-400">
-            Historical total: {formatCurrency(Object.values(upload.total_spend_per_channel).reduce((a, b) => a + b, 0))}
-          </p>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Total budget for period <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-3 flex items-center text-gray-400 text-sm">$</span>
+              <input
+                type="number"
+                min="1"
+                value={totalBudget}
+                onChange={(e) => setTotalBudget(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 pl-7 pr-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              />
+            </div>
+            <div className="mt-1 flex items-center justify-between text-xs text-gray-400">
+              <span>
+                = {formatCurrency((parseFloat(totalBudget) || 0) / periodOptions[periodIdx].periods)} per {upload.granularity.replace('ly', '')}
+                {' · '}over {periodOptions[periodIdx].periods} {upload.granularity.replace('ly', '')}s
+              </span>
+              <span>Historical avg: {formatCurrency(meanPeriodSpend * periodOptions[periodIdx].periods)}</span>
+            </div>
+          </div>
         </div>
 
         {/* Channel selection */}
