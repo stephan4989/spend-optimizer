@@ -45,3 +45,28 @@ services:
       resources:
         limits:
           memory: 8g
+
+  notebook:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: >
+      bash -c "pip install -q jupyter notebook ipykernel &&
+               jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser
+               --NotebookApp.token='' --NotebookApp.password=''
+               --notebook-dir=/notebooks"
+    ports:
+      - "8888:8888"
+    env_file: ./backend/.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONPATH=/app
+    volumes:
+      - ./backend:/app
+      - ./notebooks:/notebooks
+      - ./:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles:
+      - notebook
