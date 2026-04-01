@@ -25,8 +25,9 @@ celery_app.conf.update(
     task_track_started=True,
     # One heavy task per worker at a time — Meridian MCMC is CPU/memory intensive
     worker_prefetch_multiplier=1,
-    # Re-queue task if worker crashes mid-run
-    task_acks_late=True,
+    # Do NOT re-queue on crash — Meridian fits are long-running and a crash
+    # (OOM/SIGKILL) should mark the run as failed, not restart it silently.
+    task_acks_late=False,
     result_expires=settings.SESSION_TTL_SECONDS,
     timezone="UTC",
     enable_utc=True,

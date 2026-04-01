@@ -1,27 +1,62 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { listRuns } from '@/api/runs'
+import { getResults } from '@/api/results'
 import { useSessionStore } from '@/store/sessionStore'
 import { useRunsStore } from '@/store/runsStore'
 import { RunStatusBadge } from './RunStatusBadge'
+import { TERMINAL_STATUSES } from '@/types/run'
+
+const POLL_INTERVAL_MS = 4000
 
 export function RunsSidebar() {
   const sessionId = useSessionStore((s) => s.sessionId)
-  const { runs, setRuns, setActiveRunId } = useRunsStore()
+  const { runs, setRuns, upsertRun, setResults } = useRunsStore()
   const navigate = useNavigate()
   const { runId: activeRunId } = useParams<{ runId: string }>()
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Load runs list when session is ready
   useEffect(() => {
     if (!sessionId) return
-    listRuns(sessionId)
-      .then((res) => setRuns(res.runs))
-      .catch(() => {/* ignore — session may not have runs yet */})
-  }, [sessionId, setRuns])
+
+    const refresh = async () => {
+      try {
+        const res = await listRuns(sessionId)
+        setRuns(res.runs)
+
+        // Fetch results for any newly-completed runs not yet in the store
+        for (const run of res.runs) {
+          if (run.status === 'completed') {
+            const { results } = useRunsStore.getState()
+            if (!results[run.run_id]) {
+              try {
+                const r = await getResults(sessionId, run.run_id)
+                setResults(run.run_id, r)
+              } catch {/* ignore */}
+            }
+          }
+        }
+
+        // Stop polling if all runs are terminal
+        const hasActive = res.runs.some((r) => !TERMINAL_STATUSES.includes(r.status))
+        if (!hasActive && intervalRef.current) {
+          clearInterval(intervalRef.current)
+          intervalRef.current = null
+        }
+      } catch {/* ignore network hiccups */}
+    }
+
+    refresh()
+    intervalRef.current = setInterval(refresh, POLL_INTERVAL_MS)
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [sessionId, setRuns, upsertRun, setResults])
 
   function handleNewRun() {
     setActiveRunId(null)
-    navigate('/')
+    navigate('/new')
   }
 
   function handleSelectRun(runId: string) {
