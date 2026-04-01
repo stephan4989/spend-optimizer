@@ -80,8 +80,15 @@ def extract_response_curves(
         # Always include spend=0 and extend slightly beyond max observed
         spend_grid = np.linspace(0.0, max_spend * _CURVE_FACTOR, n_points)
 
+        # The Hill/adstock model was estimated on media normalized to [0, 1]
+        # (divided by max_weekly_spend).  We must apply the same normalization
+        # before evaluating the curve; the x-axis (spend_grid) stays in dollars
+        # for the optimizer and UI, but the model only sees the normalized values.
+        scale = max_spend if max_spend > 0 else 1.0
+        spend_normalized = spend_grid / scale
+
         contrib = _hill_adstock_contribution(
-            spend=spend_grid,
+            spend=spend_normalized,
             alpha=posterior.alpha[:, i],
             ec=posterior.ec[:, i],
             slope=posterior.slope[:, i],

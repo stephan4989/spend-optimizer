@@ -43,7 +43,12 @@ def _import_meridian():
         ) from exc
 
 
-def _build_input_data(df: pd.DataFrame, channel_names: list[str], granularity: str = "weekly"):
+def _build_input_data(
+    df: pd.DataFrame,
+    channel_names: list[str],
+    granularity: str = "weekly",
+    media_scale: dict[str, float] | None = None,
+):
     """
     Convert a tidy DataFrame into a Meridian InputData object.
 
@@ -53,6 +58,13 @@ def _build_input_data(df: pd.DataFrame, channel_names: list[str], granularity: s
         acquisitions   — KPI count per period (float)
 
     granularity: 'daily' | 'weekly' | 'monthly'
+
+    media_scale: per-channel normalization divisors (typically max observed spend).
+        The `media` array is divided by these values so that it lives in [0, 1].
+        Meridian's default priors for the Hill EC parameter assume normalized media;
+        passing raw dollar spend (e.g. $50k–$200k) pushes every observation past the
+        saturation point and produces flat curves.  `media_spend` is kept in raw
+        dollars because it is used only for budget attribution, not curve estimation.
 
     Returns a meridian.data.InputData instance.
     """
@@ -76,11 +88,27 @@ def _build_input_data(df: pd.DataFrame, channel_names: list[str], granularity: s
         coords={"geo": ["national"], "time": time_coords},
     )
 
-    # Media spend: (n_geos=1, n_media_times, n_channels)
+    # Raw spend array in dollars: (n_times, n_channels)
+    raw_spend = df[channel_names].to_numpy(dtype=float)
+
+    # Normalize media to [0, 1] per channel so Meridian's Hill priors are well-scaled.
+    # Without normalization, spend values in the $10k–$200k range make the posterior
+    # EC << actual spend everywhere, causing flat saturated curves.
+    if media_scale is not None:
+        scale_vec = np.array([media_scale[ch] for ch in channel_names], dtype=float)
+        # Avoid division by zero for zero-spend channels
+        scale_vec = np.where(scale_vec > 0, scale_vec, 1.0)
+        normalized_spend = raw_spend / scale_vec[np.newaxis, :]
+    else:
+        normalized_spend = raw_spend
+
+    media_values = normalized_spend.reshape(1, n_times, n_channels)
+    spend_values = raw_spend.reshape(1, n_times, n_channels)
+
+    # Media (normalized): (n_geos=1, n_media_times, n_channels)
     # Meridian requires the time dim to be named 'media_time' for media arrays
-    spend_values = df[channel_names].to_numpy(dtype=float).reshape(1, n_times, n_channels)
     media = xr.DataArray(
-        spend_values,
+        media_values,
         name="media",
         dims=["geo", "media_time", "media_channel"],
         coords={
@@ -90,6 +118,7 @@ def _build_input_data(df: pd.DataFrame, channel_names: list[str], granularity: s
         },
     )
 
+    # media_spend stays in raw dollars — used for budget attribution only
     media_spend = xr.DataArray(
         spend_values,
         name="media_spend",
@@ -199,7 +228,13 @@ class MeridianWrapper:
         logger.info(
             "Building InputData: %d weeks, %d channels", len(df), len(channel_names)
         )
-        input_data = _build_input_data(df, channel_names, granularity=granularity)
+        # Normalise media by max observed spend per channel.
+        # The Hill EC prior in Meridian assumes values ~[0, 1]; without this,
+        # all spend levels appear far above the saturation point → flat curves.
+        max_weekly_spend = {ch: float(df[ch].max()) for ch in channel_names}
+        input_data = _build_input_data(
+            df, channel_names, granularity=granularity, media_scale=max_weekly_spend
+        )
 
         if progress_callback:
             progress_callback(10)
@@ -227,8 +262,6 @@ class MeridianWrapper:
 
         if progress_callback:
             progress_callback(80)
-
-        max_weekly_spend = {ch: float(df[ch].max()) for ch in channel_names}
 
         return FitResult(
             mmm=mmm,
