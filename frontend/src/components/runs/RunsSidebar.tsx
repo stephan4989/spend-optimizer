@@ -11,7 +11,7 @@ const POLL_INTERVAL_MS = 4000
 
 export function RunsSidebar() {
   const sessionId = useSessionStore((s) => s.sessionId)
-  const { runs, setRuns, upsertRun, setResults } = useRunsStore()
+  const { runs, setRuns, upsertRun, setResults, setActiveRunId } = useRunsStore()
   const navigate = useNavigate()
   const { runId: activeRunId } = useParams<{ runId: string }>()
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
