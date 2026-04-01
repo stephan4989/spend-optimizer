@@ -49,6 +49,7 @@ def _build_input_data(
     granularity: str = "weekly",
     media_scale: dict[str, float] | None = None,
     kpi_scale: float = 1.0,
+    trend_values: np.ndarray | None = None,
 ):
     """
     Convert a tidy DataFrame into a Meridian InputData object.
@@ -142,13 +143,34 @@ def _build_input_data(
         coords={"geo": ["national"]},
     )
 
-    return id_lib.InputData(
+    # Controls: linear trend standardised to mean=0, std=1 as Meridian requires.
+    # Shape: (n_geos=1, n_times, n_controls=1)
+    controls = None
+    control_names = None
+    if trend_values is not None:
+        controls = xr.DataArray(
+            trend_values.reshape(1, n_times, 1),
+            name="controls",
+            dims=["geo", "time", "control"],
+            coords={
+                "geo": ["national"],
+                "time": time_coords,
+                "control": ["trend"],
+            },
+        )
+        control_names = ["trend"]
+
+    kwargs = dict(
         kpi=kpi,
         kpi_type="non_revenue",
         media=media,
         media_spend=media_spend,
         population=population,
     )
+    if controls is not None:
+        kwargs["controls"] = controls
+
+    return id_lib.InputData(**kwargs)
 
 
 def _extract_posterior(mmm, channel_names: list[str]) -> PosteriorSamples:
@@ -179,12 +201,30 @@ def _extract_posterior(mmm, channel_names: list[str]) -> PosteriorSamples:
     beta_gm = flat("beta_gm")              # (n_samples, n_geos, n_channels)
     beta = beta_gm[:, 0, :]                # take geo=0 (national) → (n_samples, n_channels)
 
+    # Intercept: tau_g shape (n_samples, n_geos) — take geo=0
+    tau = None
+    try:
+        tau_g = flat("tau_g")              # (n_samples, n_geos)
+        tau = tau_g[:, 0]                  # (n_samples,)
+    except Exception:
+        logger.warning("tau_g not found in posterior — intercept will be excluded from baseline")
+
+    # Trend coefficient: gamma_c shape (n_samples, n_controls) — take control=0
+    gamma_trend = None
+    try:
+        gamma_c = flat("gamma_c")          # (n_samples, n_controls)
+        gamma_trend = gamma_c[:, 0]        # (n_samples,)
+    except Exception:
+        pass  # no controls fitted — expected when trend not passed
+
     return PosteriorSamples(
         alpha=alpha,
         ec=ec,
         slope=slope,
         beta=beta,
         channel_names=channel_names,
+        tau=tau,
+        gamma_trend=gamma_trend,
     )
 
 
@@ -239,12 +279,22 @@ class MeridianWrapper:
         # cause prior-dominated posteriors and produce wrong curve scales.
         max_weekly_spend = {ch: float(df[ch].max()) for ch in channel_names}
         kpi_scale = float(df["acquisitions"].mean()) or 1.0
+
+        # Linear trend control: normalise to [0,1] then standardise to mean=0, std=1
+        # as Meridian requires. Lets the model separate structural growth from media ROI.
+        n_times = len(df)
+        raw_trend = np.arange(n_times, dtype=float) / max(n_times - 1, 1)
+        trend_std = raw_trend - raw_trend.mean()
+        if raw_trend.std() > 0:
+            trend_std = trend_std / raw_trend.std()
+
         input_data = _build_input_data(
             df,
             channel_names,
             granularity=granularity,
             media_scale=max_weekly_spend,
             kpi_scale=kpi_scale,
+            trend_values=trend_std,
         )
 
         if progress_callback:
@@ -283,4 +333,5 @@ class MeridianWrapper:
             kpi_scale=kpi_scale,
             r_hat_max=r_hat_max,
             ess_bulk_min=ess_bulk_min,
+            trend_values=trend_std,
         )

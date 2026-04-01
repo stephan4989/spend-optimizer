@@ -194,7 +194,7 @@ def fit_model(self, payload: dict) -> None:
             predicted_upper=predicted_upper,
         )
 
-        # Channel contributions: media accounts for ~60% of acquisitions; rest is baseline
+        # Channel contributions: media accounts for ~60% of acquisitions
         total_roi = sum(roi.values())
         media_share = 0.60
         contrib_dict: dict[str, list[float]] = {}
@@ -205,10 +205,11 @@ def fit_model(self, payload: dict) -> None:
                 for a in actual_acq
             ]
 
-        # Baseline = remaining ~40% of acquisitions not attributed to paid media
+        # Baseline = intercept (~30% flat) + linear trend (~10% growing component)
+        intercept_level = prior_acq * 0.30
         baseline = [
-            round(max(a - sum(contrib_dict[ch][t] for ch in channel_names), 0), 1)
-            for t, a in enumerate(actual_acq)
+            round(max(intercept_level + (prior_acq * 0.10 * t / max(n_rows - 1, 1)), 0), 1)
+            for t in range(n_rows)
         ]
 
         contributions = ContributionData(dates=dates, contributions=contrib_dict, baseline=baseline)
