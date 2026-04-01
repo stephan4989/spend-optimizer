@@ -228,15 +228,15 @@ export function StepResults({ run, results }: Props) {
           {[
             {
               label: 'R-hat max',
-              value: results.model_diagnostics.r_hat_max.toFixed(3),
-              good: results.model_diagnostics.r_hat_max < 1.1,
+              value: results.model_diagnostics.r_hat_max != null ? results.model_diagnostics.r_hat_max.toFixed(3) : 'N/A',
+              good: results.model_diagnostics.r_hat_max != null ? results.model_diagnostics.r_hat_max < 1.1 : null,
               hint: '< 1.1 = good convergence',
               tooltip: 'Gelman-Rubin convergence diagnostic. Compares within-chain to between-chain variance. Values close to 1.0 mean all chains converged to the same posterior. Values > 1.1 suggest divergence — increase warmup steps or check the data.',
             },
             {
               label: 'ESS bulk min',
-              value: fmt(results.model_diagnostics.ess_bulk_min),
-              good: results.model_diagnostics.ess_bulk_min > 400,
+              value: results.model_diagnostics.ess_bulk_min != null ? fmt(results.model_diagnostics.ess_bulk_min) : 'N/A',
+              good: results.model_diagnostics.ess_bulk_min != null ? results.model_diagnostics.ess_bulk_min > 400 : null,
               hint: '> 400 = sufficient samples',
               tooltip: 'Effective Sample Size for the bulk of the posterior distribution. Accounts for autocorrelation between MCMC draws. Low ESS (< 400) means the sampler is exploring slowly — increase n_samples or reduce model complexity.',
             },

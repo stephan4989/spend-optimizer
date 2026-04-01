@@ -11,8 +11,8 @@ class ResponseCurveData(BaseModel):
 
 
 class ModelDiagnostics(BaseModel):
-    r_hat_max: float
-    ess_bulk_min: int
+    r_hat_max: float | None = None
+    ess_bulk_min: int | None = None
     waic: float | None = None
 
 

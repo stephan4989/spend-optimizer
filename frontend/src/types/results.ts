@@ -6,8 +6,8 @@ export interface ResponseCurveData {
 }
 
 export interface ModelDiagnostics {
-  r_hat_max: number
-  ess_bulk_min: number
+  r_hat_max: number | null
+  ess_bulk_min: number | null
   waic: number | null
 }
 
