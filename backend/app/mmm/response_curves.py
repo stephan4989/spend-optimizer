@@ -95,11 +95,15 @@ def extract_response_curves(
             beta=posterior.beta[:, i],
         )  # (n_samples, n_points)
 
+        # Back-transform from normalized KPI units to real acquisitions
+        kpi_scale = getattr(fit_result, "kpi_scale", 1.0)
+        contrib_real = contrib * kpi_scale
+
         curves[channel] = ResponseCurveData(
             spend_points=spend_grid.tolist(),
-            acquisitions=contrib.mean(axis=0).tolist(),
-            ci_lower=np.percentile(contrib, _CI_LOWER, axis=0).tolist(),
-            ci_upper=np.percentile(contrib, _CI_UPPER, axis=0).tolist(),
+            acquisitions=contrib_real.mean(axis=0).tolist(),
+            ci_lower=np.percentile(contrib_real, _CI_LOWER, axis=0).tolist(),
+            ci_upper=np.percentile(contrib_real, _CI_UPPER, axis=0).tolist(),
         )
 
     return curves

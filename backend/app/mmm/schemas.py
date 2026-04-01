@@ -51,6 +51,9 @@ class FitResult:
     posterior: PosteriorSamples
     # Max observed weekly spend per channel — used to set curve x-axis range
     max_weekly_spend: dict[str, float]
+    # Mean KPI used to normalize acquisitions before fitting — multiply back
+    # into response curve contributions to return real acquisition units
+    kpi_scale: float
     # Diagnostics extracted from the posterior
     r_hat_max: float
     ess_bulk_min: int

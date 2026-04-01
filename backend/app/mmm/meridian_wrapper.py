@@ -48,6 +48,7 @@ def _build_input_data(
     channel_names: list[str],
     granularity: str = "weekly",
     media_scale: dict[str, float] | None = None,
+    kpi_scale: float = 1.0,
 ):
     """
     Convert a tidy DataFrame into a Meridian InputData object.
@@ -79,8 +80,11 @@ def _build_input_data(
     date_col = "date" if "date" in df.columns else "week"
     time_coords = df[date_col].tolist()
 
-    # KPI: (n_geos=1, n_times) — name must match what Meridian expects
-    kpi_values = df["acquisitions"].to_numpy(dtype=float).reshape(1, n_times)
+    # KPI: (n_geos=1, n_times) — normalized by kpi_scale so values are ~O(1).
+    # Meridian's beta prior assumes KPI in a "small" range; acquisitions in the
+    # hundreds/thousands cause beta to be underestimated (~1).  Divide here,
+    # then multiply back in response_curves.py after sampling.
+    kpi_values = (df["acquisitions"].to_numpy(dtype=float) / kpi_scale).reshape(1, n_times)
     kpi = xr.DataArray(
         kpi_values,
         name="kpi",
@@ -228,12 +232,19 @@ class MeridianWrapper:
         logger.info(
             "Building InputData: %d weeks, %d channels", len(df), len(channel_names)
         )
-        # Normalise media by max observed spend per channel.
-        # The Hill EC prior in Meridian assumes values ~[0, 1]; without this,
-        # all spend levels appear far above the saturation point → flat curves.
+        # Normalise media by max observed spend per channel (→ [0, 1]).
+        # Normalise KPI by its mean (→ ~1).
+        # Meridian's priors assume both inputs are in a "small" numeric range;
+        # raw dollar spend ($10k–$200k) and raw acquisitions (700–4500) both
+        # cause prior-dominated posteriors and produce wrong curve scales.
         max_weekly_spend = {ch: float(df[ch].max()) for ch in channel_names}
+        kpi_scale = float(df["acquisitions"].mean()) or 1.0
         input_data = _build_input_data(
-            df, channel_names, granularity=granularity, media_scale=max_weekly_spend
+            df,
+            channel_names,
+            granularity=granularity,
+            media_scale=max_weekly_spend,
+            kpi_scale=kpi_scale,
         )
 
         if progress_callback:
@@ -269,6 +280,7 @@ class MeridianWrapper:
             n_time_periods=len(df),
             posterior=posterior,
             max_weekly_spend=max_weekly_spend,
+            kpi_scale=kpi_scale,
             r_hat_max=r_hat_max,
             ess_bulk_min=ess_bulk_min,
         )
