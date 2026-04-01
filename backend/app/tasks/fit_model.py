@@ -64,6 +64,15 @@ def fit_model(self, payload: dict) -> None:
         from app.models.run import MeridianConfig
 
         config = MeridianConfig(**meridian_config_raw)
+        # Enforce minimum warmup — HMC needs enough steps to tune its step size.
+        # With < 500 warmup on a multi-channel model, chains diverge and R-hat → ∞.
+        MIN_WARMUP = 500
+        if config.n_warmup < MIN_WARMUP:
+            logger.warning(
+                "fit_model[%s]: n_warmup=%d is below minimum %d — clamping.",
+                run_id, config.n_warmup, MIN_WARMUP,
+            )
+            config = config.model_copy(update={"n_warmup": MIN_WARMUP})
         wrapper = MeridianWrapper(config)
         fit_result = wrapper.fit(
             df=df,

@@ -125,6 +125,28 @@ def _check_regular_spacing(dates: pd.Series, date_col: str, granularity: str) ->
         )
 
 
+def _check_sparse_channels(df: pd.DataFrame, channels: list[str]) -> None:
+    """
+    Reject channels where more than 70% of spend values are zero.
+    Meridian cannot estimate a Hill curve for a channel with almost no variation —
+    the posterior becomes unidentifiable and R-hat diverges.
+    """
+    sparse = []
+    for ch in channels:
+        zero_pct = (df[ch] == 0).mean() * 100
+        if zero_pct > 70:
+            sparse.append(f"  {ch}: {zero_pct:.0f}% zeros")
+
+    if sparse:
+        _fail(
+            "The following channels have too many zero-spend periods (>70%) for the model "
+            "to estimate their response curves reliably:\n\n"
+            + "\n".join(sparse) + "\n\n"
+            "Please remove these channels from your CSV or exclude them during run configuration. "
+            "Channels must have meaningful spend variation across time periods."
+        )
+
+
 def validate_csv(raw_bytes: bytes, filename: str = "") -> ValidatedCSV:
     """
     Parse and validate raw CSV bytes.
@@ -234,6 +256,9 @@ def validate_csv(raw_bytes: bytes, filename: str = "") -> ValidatedCSV:
                 f"Column '{col}' must contain numeric values only. "
                 "Found non-numeric entries."
             )
+
+    # --- warn about sparse channels (>50% zeros) ---
+    _check_sparse_channels(df, channels)
 
     # --- no negative values ---
     for col in numeric_cols:
