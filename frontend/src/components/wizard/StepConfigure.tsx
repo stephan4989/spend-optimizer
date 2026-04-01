@@ -58,7 +58,10 @@ export function StepConfigure({ upload, onComplete }: Props) {
     const nPeriods = (PERIOD_OPTIONS[upload.granularity] ?? PERIOD_OPTIONS.weekly)[defaultPeriodIdx].periods
     return Math.round(meanPeriodSpend * nPeriods).toString()
   })
-  const [selectedChannels, setSelectedChannels] = useState<string[]>(upload.channels)
+  const sparseChannels = upload.sparse_channels ?? []
+  const [selectedChannels, setSelectedChannels] = useState<string[]>(
+    upload.channels.filter((ch) => !sparseChannels.includes(ch))
+  )
   const [constraints, setConstraints] = useState<Record<string, ChannelConstraint>>(() =>
     Object.fromEntries(upload.channels.map((ch) => [ch, { min_fraction: 0, max_fraction: 1 }]))
   )
@@ -141,6 +144,16 @@ export function StepConfigure({ upload, onComplete }: Props) {
               <span className="font-mono">{from}</span> → <span className="font-mono">{to}</span>
             </span>
           ))}
+        </div>
+      )}
+
+      {sparseChannels.length > 0 && (
+        <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span className="font-medium">Some channels were automatically excluded</span> due to too many zero-spend periods (&gt;70%), which prevents the model from estimating their response curves:{' '}
+          {sparseChannels.map((ch, i) => (
+            <span key={ch}>{i > 0 && ', '}<span className="font-mono">{ch}</span></span>
+          ))}.{' '}
+          You can re-enable them below if needed.
         </div>
       )}
 

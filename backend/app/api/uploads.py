@@ -53,6 +53,7 @@ async def upload_csv(
         channel_count=len(validated.channels),
         total_spend_per_channel=validated.total_spend_per_channel,
         column_renames=validated.column_renames,
+        sparse_channels=validated.sparse_channels,
         raw_csv_key="",
     )
     record.raw_csv_key = f"upload:{record.upload_id}:raw"
@@ -70,4 +71,5 @@ async def upload_csv(
         channel_count=record.channel_count,
         total_spend_per_channel=record.total_spend_per_channel,
         column_renames=record.column_renames,
+        sparse_channels=record.sparse_channels,
     )

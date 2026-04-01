@@ -99,7 +99,7 @@ export function StepResults({ run, results }: Props) {
           <h3 className="text-sm font-semibold text-gray-800">Budget allocation</h3>
           <ExportButton results={results} />
         </div>
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead className="bg-gray-50">
               <tr>

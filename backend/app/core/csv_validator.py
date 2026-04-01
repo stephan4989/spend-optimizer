@@ -65,6 +65,7 @@ class ValidatedCSV:
     date_col: str          # actual column name used ('date', 'week', or 'month')
     total_spend_per_channel: dict[str, float]
     column_renames: dict[str, str]  # original → normalised name, for user display
+    sparse_channels: list[str]      # channels with >70% zeros — pre-excluded by default
 
 
 def _detect_granularity(dates: pd.Series) -> str:
@@ -125,26 +126,14 @@ def _check_regular_spacing(dates: pd.Series, date_col: str, granularity: str) ->
         )
 
 
-def _check_sparse_channels(df: pd.DataFrame, channels: list[str]) -> None:
+def _find_sparse_channels(df: pd.DataFrame, channels: list[str]) -> list[str]:
     """
-    Reject channels where more than 70% of spend values are zero.
-    Meridian cannot estimate a Hill curve for a channel with almost no variation —
+    Return channels where more than 70% of spend values are zero.
+    Meridian cannot estimate a Hill curve for near-zero variation channels —
     the posterior becomes unidentifiable and R-hat diverges.
+    These are returned (not rejected) so the UI can pre-exclude them.
     """
-    sparse = []
-    for ch in channels:
-        zero_pct = (df[ch] == 0).mean() * 100
-        if zero_pct > 70:
-            sparse.append(f"  {ch}: {zero_pct:.0f}% zeros")
-
-    if sparse:
-        _fail(
-            "The following channels have too many zero-spend periods (>70%) for the model "
-            "to estimate their response curves reliably:\n\n"
-            + "\n".join(sparse) + "\n\n"
-            "Please remove these channels from your CSV or exclude them during run configuration. "
-            "Channels must have meaningful spend variation across time periods."
-        )
+    return [ch for ch in channels if (df[ch] == 0).mean() > 0.70]
 
 
 def validate_csv(raw_bytes: bytes, filename: str = "") -> ValidatedCSV:
@@ -257,8 +246,8 @@ def validate_csv(raw_bytes: bytes, filename: str = "") -> ValidatedCSV:
                 "Found non-numeric entries."
             )
 
-    # --- warn about sparse channels (>50% zeros) ---
-    _check_sparse_channels(df, channels)
+    # --- identify sparse channels (>70% zeros) — excluded by default in the UI ---
+    sparse_channels = _find_sparse_channels(df, channels)
 
     # --- no negative values ---
     for col in numeric_cols:
@@ -283,6 +272,7 @@ def validate_csv(raw_bytes: bytes, filename: str = "") -> ValidatedCSV:
         date_col=date_col,
         total_spend_per_channel=total_spend,
         column_renames=column_renames,
+        sparse_channels=sparse_channels,
     )
 
 
