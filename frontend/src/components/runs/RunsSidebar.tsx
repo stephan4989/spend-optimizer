@@ -36,23 +36,19 @@ export function RunsSidebar() {
             }
           }
         }
-
-        // Stop polling if all runs are terminal
-        const hasActive = res.runs.some((r) => !TERMINAL_STATUSES.includes(r.status))
-        if (!hasActive && intervalRef.current) {
-          clearInterval(intervalRef.current)
-          intervalRef.current = null
-        }
       } catch {/* ignore network hiccups */}
     }
 
+    // Always poll on a fixed interval — never stop, so new runs are picked up
+    // immediately without needing a page reload or session change.
     refresh()
     intervalRef.current = setInterval(refresh, POLL_INTERVAL_MS)
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [sessionId, setRuns, upsertRun, setResults])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId])
 
   function handleNewRun() {
     setActiveRunId(null)
