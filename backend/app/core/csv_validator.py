@@ -65,6 +65,49 @@ def _detect_granularity(dates: pd.Series) -> str:
         return "monthly"
 
 
+def _check_regular_spacing(dates: pd.Series, date_col: str, granularity: str) -> None:
+    """
+    Verify all consecutive date gaps equal the expected period for the detected
+    granularity.  Meridian requires strictly regular time coordinates.
+
+    Raises HTTPException(422) listing every offending date pair.
+    """
+    expected_days = {"daily": 1, "weekly": 7, "monthly": 30}
+    tolerance = {"daily": 0, "weekly": 0, "monthly": 5}   # monthly allows 28-31 days
+
+    exp = expected_days[granularity]
+    tol = tolerance[granularity]
+
+    sorted_dates = dates.sort_values().reset_index(drop=True)
+
+    # Duplicate dates
+    dupes = sorted_dates[sorted_dates.duplicated()].dt.strftime("%Y-%m-%d").tolist()
+    if dupes:
+        _fail(
+            f"Duplicate dates found in '{date_col}' column: {dupes}. "
+            "Each time period must appear exactly once."
+        )
+
+    bad = []
+    for i in range(1, len(sorted_dates)):
+        days = (sorted_dates.iloc[i] - sorted_dates.iloc[i - 1]).days
+        if abs(days - exp) > tol:
+            a = sorted_dates.iloc[i - 1].strftime("%Y-%m-%d")
+            b = sorted_dates.iloc[i].strftime("%Y-%m-%d")
+            bad.append(f"  {a} → {b}: {days} days (expected {exp})")
+
+    if bad:
+        examples = bad[:5]
+        suffix = f" (and {len(bad) - 5} more)" if len(bad) > 5 else ""
+        _fail(
+            f"Date column '{date_col}' is not regularly spaced — Meridian requires "
+            f"consistent {granularity} intervals ({exp} days apart).\n\n"
+            f"Irregular gaps found:\n" + "\n".join(examples) + suffix + "\n\n"
+            "Fix: ensure every period is present with no gaps or duplicates. "
+            "For missing weeks, add a row with 0 spend and 0 acquisitions."
+        )
+
+
 def validate_csv(raw_bytes: bytes, filename: str = "") -> ValidatedCSV:
     """
     Parse and validate raw CSV bytes.
@@ -122,6 +165,9 @@ def validate_csv(raw_bytes: bytes, filename: str = "") -> ValidatedCSV:
 
     # --- detect granularity ---
     granularity = _detect_granularity(dates)
+
+    # --- regularly spaced dates (required by Meridian) ---
+    _check_regular_spacing(dates, date_col, granularity)
 
     # --- row count ---
     min_rows = MIN_ROWS[granularity]
