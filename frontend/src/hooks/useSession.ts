@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createSession } from '@/api/sessions'
 import { useSessionStore } from '@/store/sessionStore'
+import { useRunsStore } from '@/store/runsStore'
 
 /**
  * Initialises or restores the anonymous session.
@@ -14,6 +15,7 @@ import { useSessionStore } from '@/store/sessionStore'
  */
 export function useSession() {
   const { sessionId, expiresAt, setSession, clearSession, isExpired } = useSessionStore()
+  const clearRuns = useRunsStore((s) => s.clearAll)
   const [ready, setReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -24,8 +26,9 @@ export function useSession() {
           setReady(true)
           return
         }
-        // Session missing or expired — create a new one
+        // Session missing or expired — create a new one and clear stale run data
         clearSession()
+        clearRuns()
         const session = await createSession()
         setSession(session.session_id, session.expires_at)
         setReady(true)

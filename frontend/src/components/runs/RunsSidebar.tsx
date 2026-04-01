@@ -1,27 +1,58 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { listRuns } from '@/api/runs'
+import { getResults } from '@/api/results'
 import { useSessionStore } from '@/store/sessionStore'
 import { useRunsStore } from '@/store/runsStore'
 import { RunStatusBadge } from './RunStatusBadge'
+import { TERMINAL_STATUSES } from '@/types/run'
+
+const POLL_INTERVAL_MS = 4000
 
 export function RunsSidebar() {
   const sessionId = useSessionStore((s) => s.sessionId)
-  const { runs, setRuns, setActiveRunId } = useRunsStore()
+  const { runs, setRuns, upsertRun, setResults, setActiveRunId } = useRunsStore()
   const navigate = useNavigate()
   const { runId: activeRunId } = useParams<{ runId: string }>()
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Load runs list when session is ready
   useEffect(() => {
     if (!sessionId) return
-    listRuns(sessionId)
-      .then((res) => setRuns(res.runs))
-      .catch(() => {/* ignore — session may not have runs yet */})
-  }, [sessionId, setRuns])
+
+    const refresh = async () => {
+      try {
+        const res = await listRuns(sessionId)
+        setRuns(res.runs)
+
+        // Fetch results for any newly-completed runs not yet in the store
+        for (const run of res.runs) {
+          if (run.status === 'completed') {
+            const { results } = useRunsStore.getState()
+            if (!results[run.run_id]) {
+              try {
+                const r = await getResults(sessionId, run.run_id)
+                setResults(run.run_id, r)
+              } catch {/* ignore */}
+            }
+          }
+        }
+      } catch {/* ignore network hiccups */}
+    }
+
+    // Always poll on a fixed interval — never stop, so new runs are picked up
+    // immediately without needing a page reload or session change.
+    refresh()
+    intervalRef.current = setInterval(refresh, POLL_INTERVAL_MS)
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId])
 
   function handleNewRun() {
     setActiveRunId(null)
-    navigate('/')
+    navigate('/new')
   }
 
   function handleSelectRun(runId: string) {
@@ -86,9 +117,18 @@ export function RunsSidebar() {
       </nav>
 
       {/* Session info footer */}
-      <div className="border-t border-gray-200 px-4 py-3">
+      <div className="border-t border-gray-200 px-4 py-3 space-y-2">
         <p className="text-xs text-gray-400">Session expires in ~4 hrs</p>
         <p className="text-xs text-gray-400">Data is not stored permanently.</p>
+        <button
+          onClick={() => {
+            useSessionStore.getState().clearSession()
+            window.location.reload()
+          }}
+          className="text-xs text-gray-400 underline hover:text-gray-600 transition-colors"
+        >
+          Reset session
+        </button>
       </div>
     </aside>
   )

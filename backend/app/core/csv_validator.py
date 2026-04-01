@@ -30,6 +30,22 @@ DATE_COLUMN_ALIASES = {"date", "week", "month"}
 REQUIRED_FIXED = {"acquisitions"}
 MAX_CHANNELS = 10
 
+# Known aliases for the date column (case-insensitive)
+DATE_COLUMN_ALIAS_MAP: dict[str, str] = {
+    "week": "date",
+    "month": "date",
+    "date": "date",
+    "Week": "date",
+    "Month": "date",
+    "Date": "date",
+}
+
+# Known aliases for the KPI / acquisitions column (case-insensitive lookup)
+KPI_ALIASES = {
+    "sales", "revenue", "conversions", "orders", "leads",
+    "purchases", "transactions", "signups", "installs",
+}
+
 # Minimum rows per granularity
 MIN_ROWS: dict[str, int] = {
     "daily":   60,
@@ -48,6 +64,8 @@ class ValidatedCSV:
     granularity: str       # 'daily' | 'weekly' | 'monthly'
     date_col: str          # actual column name used ('date', 'week', or 'month')
     total_spend_per_channel: dict[str, float]
+    column_renames: dict[str, str]  # original → normalised name, for user display
+    sparse_channels: list[str]      # channels with >70% zeros — pre-excluded by default
 
 
 def _detect_granularity(dates: pd.Series) -> str:
@@ -65,6 +83,59 @@ def _detect_granularity(dates: pd.Series) -> str:
         return "monthly"
 
 
+def _check_regular_spacing(dates: pd.Series, date_col: str, granularity: str) -> None:
+    """
+    Verify all consecutive date gaps equal the expected period for the detected
+    granularity.  Meridian requires strictly regular time coordinates.
+
+    Raises HTTPException(422) listing every offending date pair.
+    """
+    expected_days = {"daily": 1, "weekly": 7, "monthly": 30}
+    tolerance = {"daily": 0, "weekly": 0, "monthly": 5}   # monthly allows 28-31 days
+
+    exp = expected_days[granularity]
+    tol = tolerance[granularity]
+
+    sorted_dates = dates.sort_values().reset_index(drop=True)
+
+    # Duplicate dates
+    dupes = sorted_dates[sorted_dates.duplicated()].dt.strftime("%Y-%m-%d").tolist()
+    if dupes:
+        _fail(
+            f"Duplicate dates found in '{date_col}' column: {dupes}. "
+            "Each time period must appear exactly once."
+        )
+
+    bad = []
+    for i in range(1, len(sorted_dates)):
+        days = (sorted_dates.iloc[i] - sorted_dates.iloc[i - 1]).days
+        if abs(days - exp) > tol:
+            a = sorted_dates.iloc[i - 1].strftime("%Y-%m-%d")
+            b = sorted_dates.iloc[i].strftime("%Y-%m-%d")
+            bad.append(f"  {a} → {b}: {days} days (expected {exp})")
+
+    if bad:
+        examples = bad[:5]
+        suffix = f" (and {len(bad) - 5} more)" if len(bad) > 5 else ""
+        _fail(
+            f"Date column '{date_col}' is not regularly spaced — Meridian requires "
+            f"consistent {granularity} intervals ({exp} days apart).\n\n"
+            f"Irregular gaps found:\n" + "\n".join(examples) + suffix + "\n\n"
+            "Fix: ensure every period is present with no gaps or duplicates. "
+            "For missing weeks, add a row with 0 spend and 0 acquisitions."
+        )
+
+
+def _find_sparse_channels(df: pd.DataFrame, channels: list[str]) -> list[str]:
+    """
+    Return channels where more than 70% of spend values are zero.
+    Meridian cannot estimate a Hill curve for near-zero variation channels —
+    the posterior becomes unidentifiable and R-hat diverges.
+    These are returned (not rejected) so the UI can pre-exclude them.
+    """
+    return [ch for ch in channels if (df[ch] == 0).mean() > 0.70]
+
+
 def validate_csv(raw_bytes: bytes, filename: str = "") -> ValidatedCSV:
     """
     Parse and validate raw CSV bytes.
@@ -78,7 +149,32 @@ def validate_csv(raw_bytes: bytes, filename: str = "") -> ValidatedCSV:
     except Exception as exc:
         _fail(f"Could not parse '{filename}' as CSV: {exc}")
 
-    # --- find date column ---
+    column_renames: dict[str, str] = {}
+
+    # --- normalise column names: strip whitespace, apply known aliases ---
+    # Build a case-insensitive lookup for date and KPI aliases
+    col_lower = {c.lower().strip(): c for c in df.columns}
+
+    # Remap date column
+    date_col_original = None
+    for candidate in ["date", "week", "month"]:
+        if candidate in col_lower:
+            date_col_original = col_lower[candidate]
+            break
+    if date_col_original and date_col_original != "date":
+        df = df.rename(columns={date_col_original: "date"})
+        column_renames[date_col_original] = "date"
+
+    # Remap KPI column if not already named 'acquisitions'
+    if "acquisitions" not in df.columns:
+        for alias in KPI_ALIASES:
+            if alias in col_lower:
+                original = col_lower[alias]
+                df = df.rename(columns={original: "acquisitions"})
+                column_renames[original] = "acquisitions"
+                break
+
+    # --- find date column (after remapping) ---
     date_col = None
     for alias in DATE_COLUMN_ALIASES:
         if alias in df.columns:
@@ -93,7 +189,8 @@ def validate_csv(raw_bytes: bytes, filename: str = "") -> ValidatedCSV:
     # --- required fixed columns ---
     if "acquisitions" not in df.columns:
         _fail(
-            f"Missing required column 'acquisitions'. "
+            "Missing required column 'acquisitions' (or a recognised alias: "
+            f"{', '.join(sorted(KPI_ALIASES))}). "
             f"Found columns: {list(df.columns)}"
         )
 
@@ -123,6 +220,9 @@ def validate_csv(raw_bytes: bytes, filename: str = "") -> ValidatedCSV:
     # --- detect granularity ---
     granularity = _detect_granularity(dates)
 
+    # --- regularly spaced dates (required by Meridian) ---
+    _check_regular_spacing(dates, date_col, granularity)
+
     # --- row count ---
     min_rows = MIN_ROWS[granularity]
     if len(df) < min_rows:
@@ -146,6 +246,9 @@ def validate_csv(raw_bytes: bytes, filename: str = "") -> ValidatedCSV:
                 "Found non-numeric entries."
             )
 
+    # --- identify sparse channels (>70% zeros) — excluded by default in the UI ---
+    sparse_channels = _find_sparse_channels(df, channels)
+
     # --- no negative values ---
     for col in numeric_cols:
         if (df[col] < 0).any():
@@ -168,6 +271,8 @@ def validate_csv(raw_bytes: bytes, filename: str = "") -> ValidatedCSV:
         granularity=granularity,
         date_col=date_col,
         total_spend_per_channel=total_spend,
+        column_renames=column_renames,
+        sparse_channels=sparse_channels,
     )
 
 

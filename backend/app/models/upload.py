@@ -28,6 +28,8 @@ class UploadRecord(BaseModel):
     channel_count: int
     total_spend_per_channel: dict[str, float]
     raw_csv_key: str
+    column_renames: dict[str, str] = Field(default_factory=dict)
+    sparse_channels: list[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -43,3 +45,5 @@ class UploadResponse(BaseModel):
     channels: list[str]
     channel_count: int
     total_spend_per_channel: dict[str, float]
+    column_renames: dict[str, str] = Field(default_factory=dict)
+    sparse_channels: list[str] = Field(default_factory=list)

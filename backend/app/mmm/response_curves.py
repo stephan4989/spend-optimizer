@@ -80,19 +80,30 @@ def extract_response_curves(
         # Always include spend=0 and extend slightly beyond max observed
         spend_grid = np.linspace(0.0, max_spend * _CURVE_FACTOR, n_points)
 
+        # The Hill/adstock model was estimated on media normalized to [0, 1]
+        # (divided by max_weekly_spend).  We must apply the same normalization
+        # before evaluating the curve; the x-axis (spend_grid) stays in dollars
+        # for the optimizer and UI, but the model only sees the normalized values.
+        scale = max_spend if max_spend > 0 else 1.0
+        spend_normalized = spend_grid / scale
+
         contrib = _hill_adstock_contribution(
-            spend=spend_grid,
+            spend=spend_normalized,
             alpha=posterior.alpha[:, i],
             ec=posterior.ec[:, i],
             slope=posterior.slope[:, i],
             beta=posterior.beta[:, i],
         )  # (n_samples, n_points)
 
+        # Back-transform from normalized KPI units to real acquisitions
+        kpi_scale = getattr(fit_result, "kpi_scale", 1.0)
+        contrib_real = contrib * kpi_scale
+
         curves[channel] = ResponseCurveData(
             spend_points=spend_grid.tolist(),
-            acquisitions=contrib.mean(axis=0).tolist(),
-            ci_lower=np.percentile(contrib, _CI_LOWER, axis=0).tolist(),
-            ci_upper=np.percentile(contrib, _CI_UPPER, axis=0).tolist(),
+            acquisitions=contrib_real.mean(axis=0).tolist(),
+            ci_lower=np.percentile(contrib_real, _CI_LOWER, axis=0).tolist(),
+            ci_upper=np.percentile(contrib_real, _CI_UPPER, axis=0).tolist(),
         )
 
     return curves

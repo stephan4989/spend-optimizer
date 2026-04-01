@@ -3,6 +3,11 @@ import type { RunSummary } from '@/types/run'
 import { RunStatusBadge } from '@/components/runs/RunStatusBadge'
 import { ResponseCurveChart } from '@/components/charts/ResponseCurveChart'
 import { BudgetAllocationChart } from '@/components/charts/BudgetAllocationChart'
+import { ModelFitChart } from '@/components/charts/ModelFitChart'
+import { ContributionChart } from '@/components/charts/ContributionChart'
+import { MarginalCPAChart } from '@/components/charts/MarginalCPAChart'
+import { MetricTooltip } from '@/components/common/MetricTooltip'
+import { ScenarioPanel } from '@/components/wizard/ScenarioPanel'
 
 interface Props {
   run: RunSummary
@@ -43,6 +48,7 @@ export function StepResults({ run, results }: Props) {
   const liftPositive = results.lift_pct >= 0
   const totalPrior = Object.values(results.prior_allocation).reduce((a, b) => a + b, 0)
   const totalOptimized = Object.values(results.optimized_allocation).reduce((a, b) => a + b, 0)
+  const n = results.n_periods
 
   return (
     <div className="mx-auto max-w-3xl px-8 py-10 space-y-8">
@@ -51,10 +57,23 @@ export function StepResults({ run, results }: Props) {
         <div>
           <h2 className="text-xl font-semibold text-gray-900">{results.run_label}</h2>
           <p className="mt-1 text-sm text-gray-500">
-            {results.channels.length} channels · Optimisation complete
+            {results.channels.length} channels · {results.planning_period_label} plan ({results.n_periods} periods) · Optimisation complete
           </p>
         </div>
         <RunStatusBadge status="completed" />
+      </div>
+
+      {/* Planning period budget summary */}
+      <div className="rounded-xl border border-brand-200 bg-brand-50 px-5 py-4 flex items-center justify-between">
+        <div>
+          <p className="text-xs font-medium text-brand-700 uppercase tracking-wide">{results.planning_period_label} budget</p>
+          <p className="mt-1 text-2xl font-bold text-brand-900">{fmtCurrency(totalOptimized * n)}</p>
+          <p className="mt-0.5 text-xs text-brand-600">{fmtCurrency(totalOptimized)} per period × {n} periods</p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-brand-600">Prior mix total</p>
+          <p className="text-lg font-semibold text-brand-800">{fmtCurrency(totalPrior * n)}</p>
+        </div>
       </div>
 
       {/* Lift summary cards */}
@@ -62,12 +81,12 @@ export function StepResults({ run, results }: Props) {
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Prior acquisitions</p>
           <p className="mt-2 text-2xl font-bold text-gray-900">{fmt(results.prior_total_acquisitions)}</p>
-          <p className="mt-0.5 text-xs text-gray-400">at prior allocation</p>
+          <p className="mt-0.5 text-xs text-gray-400">per period at prior mix</p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Optimised acquisitions</p>
           <p className="mt-2 text-2xl font-bold text-gray-900">{fmt(results.optimized_total_acquisitions)}</p>
-          <p className="mt-0.5 text-xs text-gray-400">at optimised allocation</p>
+          <p className="mt-0.5 text-xs text-gray-400">per period at optimised mix</p>
         </div>
         <div className={`rounded-xl border p-5 ${liftPositive ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
           <p className={`text-xs font-medium uppercase tracking-wide ${liftPositive ? 'text-green-600' : 'text-red-600'}`}>Estimated lift</p>
@@ -84,15 +103,16 @@ export function StepResults({ run, results }: Props) {
           <h3 className="text-sm font-semibold text-gray-800">Budget allocation</h3>
           <ExportButton results={results} />
         </div>
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Channel</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Prior spend</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Prior / period</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Prior share</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Optimised spend</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Optimised share</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Optimised / period</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Optimised total</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Share</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Change</th>
               </tr>
             </thead>
@@ -109,6 +129,7 @@ export function StepResults({ run, results }: Props) {
                     <td className="px-4 py-3 text-right text-gray-600">{fmtCurrency(prior)}</td>
                     <td className="px-4 py-3 text-right text-gray-500">{priorShare.toFixed(1)}%</td>
                     <td className="px-4 py-3 text-right font-medium text-gray-900">{fmtCurrency(optimized)}</td>
+                    <td className="px-4 py-3 text-right text-gray-700">{fmtCurrency(optimized * n)}</td>
                     <td className="px-4 py-3 text-right text-gray-500">{optimizedShare.toFixed(1)}%</td>
                     <td className={`px-4 py-3 text-right font-medium ${delta >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {delta >= 0 ? '+' : ''}{fmtCurrency(delta)}
@@ -123,6 +144,7 @@ export function StepResults({ run, results }: Props) {
                 <td className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{fmtCurrency(totalPrior)}</td>
                 <td className="px-4 py-2 text-right text-xs text-gray-400">100%</td>
                 <td className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{fmtCurrency(totalOptimized)}</td>
+                <td className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{fmtCurrency(totalOptimized * n)}</td>
                 <td className="px-4 py-2 text-right text-xs text-gray-400">100%</td>
                 <td className="px-4 py-2" />
               </tr>
@@ -131,11 +153,57 @@ export function StepResults({ run, results }: Props) {
         </div>
       </div>
 
-      {/* Response curves */}
+      {/* ── 1. Model Fit ──────────────────────────────────────────────── */}
       <div>
-        <h3 className="mb-3 text-sm font-semibold text-gray-800">Response curves</h3>
+        <h3 className="mb-1 flex items-center text-sm font-semibold text-gray-800">
+          Model fit — actual vs predicted
+          <MetricTooltip text="Predicted is the full in-sample model prediction: ŷ = tau_g + mu_t + Σ(beta_m × Hill(Adstock(x_m))) + gamma_c × trend. It should track actual closely if the model fits well. The shaded band is the 80% credible interval across posterior samples. Large gaps indicate missing drivers (seasonality, promotions)." />
+        </h3>
+        <p className="mb-3 text-xs text-gray-400">Full model prediction (intercept + trend + media) vs observed KPI</p>
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          {results.model_fit
+            ? <ModelFitChart data={results.model_fit} />
+            : <p className="py-8 text-center text-xs text-gray-400">Model fit data not available for this run.</p>
+          }
+        </div>
+      </div>
+
+      {/* ── 2. Channel Contributions ───────────────────────────────── */}
+      <div>
+        <h3 className="mb-1 flex items-center text-sm font-semibold text-gray-800">
+          Channel contribution breakdown
+          <MetricTooltip text="Per-channel media contributions computed using time-series adstock: contrib_m = beta_m × Hill(Adstock(x_m)). Baseline = ŷ(full model) − Σ(media contributions) = tau_g + mu_t + gamma_c × trend, i.e. acquisitions if all media spend were zero. Stacked area always sums to the full model prediction." />
+        </h3>
+        <p className="mb-3 text-xs text-gray-400">Acquisitions attributed to each channel over time</p>
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          {results.contributions
+            ? <ContributionChart data={results.contributions} channels={results.channels} />
+            : <p className="py-8 text-center text-xs text-gray-400">Contribution data not available for this run.</p>
+          }
+        </div>
+      </div>
+
+      {/* ── 3. Response Curves ─────────────────────────────────────── */}
+      <div>
+        <h3 className="mb-1 flex items-center text-sm font-semibold text-gray-800">
+          Response curves
+          <MetricTooltip text="Spend vs expected acquisitions for each channel, evaluated at steady-state using the Hill-Adstock model. The x-axis is weekly spend; the y-axis is incremental acquisitions expected at that spend level. Shaded bands show the 80% credible interval across posterior samples. Dots mark the current (prior) spend level for each channel." />
+        </h3>
+        <p className="mb-3 text-xs text-gray-400">Diminishing returns — how each channel converts spend to acquisitions</p>
         <div className="rounded-xl border border-gray-200 bg-white p-4">
           <ResponseCurveChart results={results} />
+        </div>
+      </div>
+
+      {/* ── 4. Marginal CPA ───────────────────────────────────────────── */}
+      <div>
+        <h3 className="mb-1 flex items-center text-sm font-semibold text-gray-800">
+          Marginal CPA by channel
+          <MetricTooltip text="Marginal CPA = ΔSpend / ΔAcquisitions between consecutive points on the response curve. It shows the cost of acquiring the next customer as you increase spend. A rising curve means diminishing returns — each additional dollar buys fewer acquisitions. The optimal budget splits spend across channels until their marginal CPAs are equal (the Lagrangian condition the optimizer solves)." />
+        </h3>
+        <p className="mb-3 text-xs text-gray-400">Cost of the next acquisition as spend increases — where efficiency breaks down</p>
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <MarginalCPAChart results={results} />
         </div>
       </div>
 
@@ -147,17 +215,65 @@ export function StepResults({ run, results }: Props) {
         </div>
       </div>
 
-      {/* Model diagnostics */}
+      {/* Budget scenario */}
+      <ScenarioPanel run_id={results.run_id} results={results} />
+
+      {/* ── Model diagnostics ─────────────────────────────────────── */}
       <div>
-        <h3 className="mb-3 text-sm font-semibold text-gray-800">Model diagnostics</h3>
-        <div className="grid grid-cols-3 gap-4">
+        <h3 className="mb-3 flex items-center text-sm font-semibold text-gray-800">
+          Model diagnostics
+          <MetricTooltip text="MCMC convergence and sample quality metrics. R-hat measures chain mixing — values < 1.1 indicate the chains have converged. ESS (effective sample size) measures how many independent samples the chains are equivalent to — higher is better. WAIC (Widely Applicable Information Criterion) measures out-of-sample predictive accuracy relative to other runs of the same model — lower is better." />
+        </h3>
+        <div className="grid grid-cols-3 gap-4 sm:grid-cols-3">
           {[
-            { label: 'R-hat max', value: results.model_diagnostics.r_hat_max.toFixed(3), good: results.model_diagnostics.r_hat_max < 1.1, hint: '< 1.1 = good convergence' },
-            { label: 'ESS bulk min', value: fmt(results.model_diagnostics.ess_bulk_min), good: results.model_diagnostics.ess_bulk_min > 400, hint: '> 400 = sufficient samples' },
-            { label: 'WAIC', value: results.model_diagnostics.waic != null ? results.model_diagnostics.waic.toFixed(1) : 'N/A', good: null, hint: 'Lower is better' },
-          ].map(({ label, value, good, hint }) => (
+            {
+              label: 'R²',
+              value: results.model_diagnostics.r_squared != null ? results.model_diagnostics.r_squared.toFixed(3) : 'N/A',
+              good: results.model_diagnostics.r_squared != null ? results.model_diagnostics.r_squared > 0.7 : null,
+              hint: 'Closer to 1 = better fit',
+              tooltip: 'Coefficient of determination — share of variance in actual KPI explained by the model. Formula: R² = 1 − SS_res / SS_tot. Values above 0.7 indicate a good fit for MMM. Low R² means the model is missing important drivers (seasonality, promotions, etc.).',
+            },
+            {
+              label: 'MAPE',
+              value: results.model_diagnostics.mape != null ? `${results.model_diagnostics.mape.toFixed(1)}%` : 'N/A',
+              good: results.model_diagnostics.mape != null ? results.model_diagnostics.mape < 15 : null,
+              hint: '< 15% = acceptable for MMM',
+              tooltip: 'Mean Absolute Percentage Error — average of |actual − predicted| / actual across all time periods. Formula: MAPE = (1/T) × Σ|y_t − ŷ_t| / y_t. Less sensitive to scale than RMSE. Values < 10% are strong; 10–20% is typical for MMM.',
+            },
+            {
+              label: 'wMAPE',
+              value: results.model_diagnostics.wmape != null ? `${results.model_diagnostics.wmape.toFixed(1)}%` : 'N/A',
+              good: results.model_diagnostics.wmape != null ? results.model_diagnostics.wmape < 15 : null,
+              hint: '< 15% = acceptable for MMM',
+              tooltip: 'Weighted MAPE — like MAPE but weights each period by its actual KPI value, so high-volume periods matter more. Formula: wMAPE = Σ|y_t − ŷ_t| / Σy_t. More robust than MAPE when KPI values are volatile or near zero.',
+            },
+            {
+              label: 'R-hat max',
+              value: results.model_diagnostics.r_hat_max != null ? results.model_diagnostics.r_hat_max.toFixed(3) : 'N/A',
+              good: results.model_diagnostics.r_hat_max != null ? results.model_diagnostics.r_hat_max < 1.1 : null,
+              hint: '< 1.1 = good convergence',
+              tooltip: 'Gelman-Rubin convergence diagnostic. Compares within-chain to between-chain variance. Values close to 1.0 mean all chains converged to the same posterior. Values > 1.1 suggest divergence — increase warmup steps or check the data.',
+            },
+            {
+              label: 'ESS bulk min',
+              value: results.model_diagnostics.ess_bulk_min != null ? fmt(results.model_diagnostics.ess_bulk_min) : 'N/A',
+              good: results.model_diagnostics.ess_bulk_min != null ? results.model_diagnostics.ess_bulk_min > 400 : null,
+              hint: '> 400 = sufficient samples',
+              tooltip: 'Effective Sample Size for the bulk of the posterior distribution. Accounts for autocorrelation between MCMC draws. Low ESS (< 400) means the sampler is exploring slowly — increase n_samples or reduce model complexity.',
+            },
+            {
+              label: 'WAIC',
+              value: results.model_diagnostics.waic != null ? results.model_diagnostics.waic.toFixed(1) : 'N/A',
+              good: null,
+              hint: 'Lower is better',
+              tooltip: 'Widely Applicable Information Criterion — a Bayesian measure of out-of-sample predictive accuracy, penalised for model complexity. Use this to compare different channel configurations or prior settings for the same dataset. Lower values indicate better predictive performance.',
+            },
+          ].map(({ label, value, good, hint, tooltip }) => (
             <div key={label} className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-              <p className="text-xs text-gray-500">{label}</p>
+              <p className="flex items-center text-xs text-gray-500">
+                {label}
+                <MetricTooltip text={tooltip} />
+              </p>
               <p className={`mt-1 text-lg font-bold ${good === true ? 'text-green-600' : good === false ? 'text-amber-600' : 'text-gray-800'}`}>
                 {value}
               </p>

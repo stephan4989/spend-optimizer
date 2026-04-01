@@ -17,18 +17,56 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value)
 }
 
+// Planning period options per data granularity.
+// `periods` = number of data rows (weeks/days/months) in that planning window.
+const PERIOD_OPTIONS: Record<string, { label: string; periods: number }[]> = {
+  daily:   [
+    { label: 'Weekly',    periods: 7   },
+    { label: 'Monthly',   periods: 30  },
+    { label: 'Quarterly', periods: 91  },
+    { label: 'Annual',    periods: 365 },
+  ],
+  weekly:  [
+    { label: 'Monthly',   periods: 4  },
+    { label: 'Quarterly', periods: 13 },
+    { label: 'Annual',    periods: 52 },
+  ],
+  monthly: [
+    { label: 'Quarterly', periods: 3  },
+    { label: 'Annual',    periods: 12 },
+  ],
+}
+
+// Default planning period index per granularity (quarterly for daily/weekly, annual for monthly)
+const DEFAULT_PERIOD_IDX: Record<string, number> = { daily: 2, weekly: 1, monthly: 1 }
+
 export function StepConfigure({ upload, onComplete }: Props) {
   const sessionId = useSessionStore((s) => s.sessionId)!
   const { upsertRun } = useRunsStore()
   const navigate = useNavigate()
 
-  const [runLabel, setRunLabel] = useState('')
+  const periodOptions = PERIOD_OPTIONS[upload.granularity] ?? PERIOD_OPTIONS.weekly
+  const defaultPeriodIdx = DEFAULT_PERIOD_IDX[upload.granularity] ?? 1
+
+  // Mean spend per data period (week / day / month)
+  const meanPeriodSpend = Object.values(upload.total_spend_per_channel).reduce((a, b) => a + b, 0) / upload.rows
+
+  const defaultRunLabel = (() => {
+    const base = upload.filename.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim()
+    const period = (PERIOD_OPTIONS[upload.granularity] ?? PERIOD_OPTIONS.weekly)[defaultPeriodIdx].label
+    return `${base} – ${period}`
+  })()
+  const [runLabel, setRunLabel] = useState(defaultRunLabel)
+  const [periodIdx, setPeriodIdx] = useState(defaultPeriodIdx)
   const [totalBudget, setTotalBudget] = useState<string>(() => {
-    // Default: sum of historical spend per channel
-    const total = Object.values(upload.total_spend_per_channel).reduce((a, b) => a + b, 0)
-    return Math.round(total).toString()
+    // Default: mean per-period spend × periods in default planning window
+    const nPeriods = (PERIOD_OPTIONS[upload.granularity] ?? PERIOD_OPTIONS.weekly)[defaultPeriodIdx].periods
+    return Math.round(meanPeriodSpend * nPeriods).toString()
   })
-  const [selectedChannels, setSelectedChannels] = useState<string[]>(upload.channels)
+  const sparseChannels = upload.sparse_channels ?? []
+  const [selectedChannels, setSelectedChannels] = useState<string[]>(
+    upload.channels.filter((ch) => !sparseChannels.includes(ch))
+  )
   const [constraints, setConstraints] = useState<Record<string, ChannelConstraint>>(() =>
     Object.fromEntries(upload.channels.map((ch) => [ch, { min_fraction: 0, max_fraction: 1 }]))
   )
@@ -59,10 +97,16 @@ export function StepConfigure({ upload, onComplete }: Props) {
     setSubmitting(true)
     setError(null)
     try {
+      // Send per-period budget to the optimizer — response curves are in per-period units
+      const nPeriods = periodOptions[periodIdx].periods
+      const perPeriodBudget = budget / nPeriods
+
       const run = await createRun(sessionId, {
         upload_id: upload.upload_id,
         run_label: runLabel.trim(),
-        total_budget: budget,
+        total_budget: perPeriodBudget,
+        planning_period_label: periodOptions[periodIdx].label,
+        n_periods: nPeriods,
         channel_names: selectedChannels,
         channel_constraints: Object.fromEntries(
           selectedChannels.map((ch) => [ch, constraints[ch] ?? { min_fraction: 0, max_fraction: 1 }])
@@ -96,6 +140,28 @@ export function StepConfigure({ upload, onComplete }: Props) {
         </p>
       </div>
 
+      {Object.keys(upload.column_renames ?? {}).length > 0 && (
+        <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          <span className="font-medium">Columns were automatically renamed</span> to match the required format:{' '}
+          {Object.entries(upload.column_renames).map(([from, to], i) => (
+            <span key={from}>
+              {i > 0 && ', '}
+              <span className="font-mono">{from}</span> → <span className="font-mono">{to}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {sparseChannels.length > 0 && (
+        <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span className="font-medium">Some channels were automatically excluded</span> due to too many zero-spend periods (&gt;70%), which prevents the model from estimating their response curves:{' '}
+          {sparseChannels.map((ch, i) => (
+            <span key={ch}>{i > 0 && ', '}<span className="font-mono">{ch}</span></span>
+          ))}.{' '}
+          You can re-enable them below if needed.
+        </div>
+      )}
+
       {error && (
         <div className="mb-5">
           <ErrorBanner message={error} onDismiss={() => setError(null)} />
@@ -123,24 +189,64 @@ export function StepConfigure({ upload, onComplete }: Props) {
           {' · '}{upload.rows} rows · {upload.granularity} · {upload.date_range.start} → {upload.date_range.end}
         </div>
 
-        {/* Total budget */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Optimisation budget <span className="text-red-500">*</span>
-          </label>
-          <div className="relative">
-            <span className="absolute inset-y-0 left-3 flex items-center text-gray-400 text-sm">$</span>
-            <input
-              type="number"
-              min="1"
-              value={totalBudget}
-              onChange={(e) => setTotalBudget(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 pl-7 pr-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-            />
+        {/* Planning period + budget */}
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Planning period <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-2">
+              {periodOptions.map((opt, idx) => (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => {
+                    // Recalculate default budget for new period
+                    setTotalBudget(Math.round(meanPeriodSpend * opt.periods).toString())
+                    setPeriodIdx(idx)
+                  }}
+                  className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                    periodIdx === idx
+                      ? 'bg-brand-600 border-brand-600 text-white'
+                      : 'bg-white border-gray-300 text-gray-600 hover:border-brand-400'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <p className="mt-1 text-xs text-gray-400">
-            Historical total: {formatCurrency(Object.values(upload.total_spend_per_channel).reduce((a, b) => a + b, 0))}
-          </p>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Total budget for period <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <span className="absolute inset-y-0 left-3 flex items-center text-gray-400 text-sm">$</span>
+              <input
+                type="number"
+                min="1"
+                value={totalBudget}
+                onChange={(e) => setTotalBudget(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 pl-7 pr-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              />
+            </div>
+            <div className="mt-1 flex items-center justify-between text-xs text-gray-400">
+              <span>
+                = {formatCurrency((parseFloat(totalBudget) || 0) / periodOptions[periodIdx].periods)} per {upload.granularity.replace('ly', '')}
+                {' · '}over {periodOptions[periodIdx].periods} {upload.granularity.replace('ly', '')}s
+              </span>
+              <span>Historical avg: {formatCurrency(meanPeriodSpend * periodOptions[periodIdx].periods)}</span>
+            </div>
+            {(() => {
+              const perPeriodBudget = (parseFloat(totalBudget) || 0) / periodOptions[periodIdx].periods
+              return perPeriodBudget > meanPeriodSpend * 3 ? (
+                <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Per-period budget ({formatCurrency(perPeriodBudget)}) is more than 3× the historical average ({formatCurrency(meanPeriodSpend)}). The model has no data at this spend level — results may be unreliable.
+                </div>
+              ) : null
+            })()}
+          </div>
         </div>
 
         {/* Channel selection */}
@@ -216,24 +322,38 @@ export function StepConfigure({ upload, onComplete }: Props) {
             </svg>
           </button>
           {showAdvanced && (
-            <div className="border-t border-gray-200 px-4 py-4 grid grid-cols-3 gap-4">
-              {([
-                { key: 'n_chains', label: 'Chains', min: 1, max: 8 },
-                { key: 'n_warmup', label: 'Warmup steps', min: 100, max: 2000 },
-                { key: 'n_samples', label: 'Samples', min: 100, max: 4000 },
-              ] as const).map(({ key, label, min, max }) => (
-                <div key={key}>
-                  <label className="text-xs text-gray-500">{label}</label>
-                  <input
-                    type="number"
-                    min={min}
-                    max={max}
-                    value={meridianConfig[key]}
-                    onChange={(e) => setMeridianConfig((c) => ({ ...c, [key]: parseInt(e.target.value) || c[key] }))}
-                    className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-xs focus:border-brand-500 focus:outline-none"
-                  />
+            <div className="border-t border-gray-200 px-4 py-4 space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                {([
+                  { key: 'n_chains', label: 'Chains', min: 1, max: 8 },
+                  { key: 'n_warmup', label: 'Warmup steps', min: 100, max: 2000 },
+                  { key: 'n_samples', label: 'Samples', min: 100, max: 4000 },
+                ] as const).map(({ key, label, min, max }) => (
+                  <div key={key}>
+                    <label className="text-xs text-gray-500">{label}</label>
+                    <input
+                      type="number"
+                      min={min}
+                      max={max}
+                      value={meridianConfig[key]}
+                      onChange={(e) => setMeridianConfig((c) => ({ ...c, [key]: parseInt(e.target.value) || c[key] }))}
+                      className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-xs focus:border-brand-500 focus:outline-none"
+                    />
+                  </div>
+                ))}
+              </div>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={meridianConfig.enable_aks}
+                  onChange={(e) => setMeridianConfig((c) => ({ ...c, enable_aks: e.target.checked }))}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-brand-600"
+                />
+                <div>
+                  <p className="text-xs font-medium text-gray-700">Seasonality (AKS)</p>
+                  <p className="text-xs text-gray-400">Fits a piecewise spline over time to capture seasonal patterns. Increases fit time and memory usage.</p>
                 </div>
-              ))}
+              </label>
             </div>
           )}
         </div>
