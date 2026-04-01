@@ -87,7 +87,7 @@ def fit_model(self, payload: dict) -> None:
         # ── Phase 3: response curves + time-series analytics ─────────────
         progress(82)
         from app.mmm.response_curves import extract_response_curves
-        from app.mmm.model_analytics import extract_model_fit, extract_channel_contributions
+        from app.mmm.model_analytics import extract_model_fit, extract_channel_contributions, extract_fit_metrics
         from app.models.results import ModelFitData, ContributionData
 
         response_curves = extract_response_curves(fit_result)
@@ -97,6 +97,8 @@ def fit_model(self, payload: dict) -> None:
 
         contrib_raw = extract_channel_contributions(df, fit_result)
         contributions = ContributionData(**contrib_raw)
+
+        fit_metrics = extract_fit_metrics(fit_result)
 
         # ── Phase 4: budget optimisation ──────────────────────────────────
         progress(88, RunStatus.optimizing)
@@ -134,6 +136,9 @@ def fit_model(self, payload: dict) -> None:
             model_diagnostics=ModelDiagnostics(
                 r_hat_max=fit_result.r_hat_max,
                 ess_bulk_min=fit_result.ess_bulk_min,
+                r_squared=fit_metrics.get("r_squared"),
+                mape=fit_metrics.get("mape"),
+                wmape=fit_metrics.get("wmape"),
             ),
             planning_period_label=planning_period_label,
             n_periods=n_periods,

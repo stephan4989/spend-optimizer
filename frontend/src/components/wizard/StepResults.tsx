@@ -224,8 +224,29 @@ export function StepResults({ run, results }: Props) {
           Model diagnostics
           <MetricTooltip text="MCMC convergence and sample quality metrics. R-hat measures chain mixing — values < 1.1 indicate the chains have converged. ESS (effective sample size) measures how many independent samples the chains are equivalent to — higher is better. WAIC (Widely Applicable Information Criterion) measures out-of-sample predictive accuracy relative to other runs of the same model — lower is better." />
         </h3>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-4 sm:grid-cols-3">
           {[
+            {
+              label: 'R²',
+              value: results.model_diagnostics.r_squared != null ? results.model_diagnostics.r_squared.toFixed(3) : 'N/A',
+              good: results.model_diagnostics.r_squared != null ? results.model_diagnostics.r_squared > 0.7 : null,
+              hint: 'Closer to 1 = better fit',
+              tooltip: 'Coefficient of determination — share of variance in actual KPI explained by the model. Formula: R² = 1 − SS_res / SS_tot. Values above 0.7 indicate a good fit for MMM. Low R² means the model is missing important drivers (seasonality, promotions, etc.).',
+            },
+            {
+              label: 'MAPE',
+              value: results.model_diagnostics.mape != null ? `${results.model_diagnostics.mape.toFixed(1)}%` : 'N/A',
+              good: results.model_diagnostics.mape != null ? results.model_diagnostics.mape < 15 : null,
+              hint: '< 15% = acceptable for MMM',
+              tooltip: 'Mean Absolute Percentage Error — average of |actual − predicted| / actual across all time periods. Formula: MAPE = (1/T) × Σ|y_t − ŷ_t| / y_t. Less sensitive to scale than RMSE. Values < 10% are strong; 10–20% is typical for MMM.',
+            },
+            {
+              label: 'wMAPE',
+              value: results.model_diagnostics.wmape != null ? `${results.model_diagnostics.wmape.toFixed(1)}%` : 'N/A',
+              good: results.model_diagnostics.wmape != null ? results.model_diagnostics.wmape < 15 : null,
+              hint: '< 15% = acceptable for MMM',
+              tooltip: 'Weighted MAPE — like MAPE but weights each period by its actual KPI value, so high-volume periods matter more. Formula: wMAPE = Σ|y_t − ŷ_t| / Σy_t. More robust than MAPE when KPI values are volatile or near zero.',
+            },
             {
               label: 'R-hat max',
               value: results.model_diagnostics.r_hat_max != null ? results.model_diagnostics.r_hat_max.toFixed(3) : 'N/A',

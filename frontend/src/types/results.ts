@@ -9,6 +9,9 @@ export interface ModelDiagnostics {
   r_hat_max: number | null
   ess_bulk_min: number | null
   waic: number | null
+  r_squared: number | null
+  mape: number | null
+  wmape: number | null
 }
 
 export interface ModelFitData {

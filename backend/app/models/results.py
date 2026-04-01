@@ -14,6 +14,9 @@ class ModelDiagnostics(BaseModel):
     r_hat_max: float | None = None
     ess_bulk_min: int | None = None
     waic: float | None = None
+    r_squared: float | None = None   # variance in KPI explained by the model
+    mape: float | None = None        # mean absolute percentage error
+    wmape: float | None = None       # weighted MAPE
 
 
 class ModelFitData(BaseModel):
