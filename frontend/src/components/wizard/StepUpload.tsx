@@ -30,16 +30,18 @@ function validateAndPreview(_file: File, text: string): ParsedPreview {
   const totalRows = rows.length
 
   const DATE_ALIASES = ['date', 'week', 'month']
-  const dateCol = DATE_ALIASES.find((c) => headers.includes(c))
-  if (!dateCol || !headers.includes('acquisitions')) {
+  const KPI_ALIASES = ['acquisitions', 'sales', 'revenue', 'conversions', 'orders', 'leads', 'purchases', 'transactions', 'signups', 'installs']
+  const dateCol = DATE_ALIASES.find((c) => headers.map(h => h.toLowerCase()).includes(c))
+  const kpiCol = KPI_ALIASES.find((c) => headers.map(h => h.toLowerCase()).includes(c))
+  if (!dateCol || !kpiCol) {
     const missing = []
     if (!dateCol) missing.push("'date', 'week', or 'month'")
-    if (!headers.includes('acquisitions')) missing.push("'acquisitions'")
+    if (!kpiCol) missing.push("'acquisitions' (or: sales, revenue, conversions, orders)")
     return { headers, rows, totalRows, channels: [], validationError: `Missing required column(s): ${missing.join(', ')}` }
   }
 
-  const reserved = new Set([...DATE_ALIASES, 'acquisitions'])
-  const channels = headers.filter((h) => !reserved.has(h))
+  const reserved = new Set([...DATE_ALIASES, ...KPI_ALIASES])
+  const channels = headers.filter((h) => !reserved.has(h.toLowerCase()))
   if (channels.length === 0) {
     return { headers, rows, totalRows, channels, validationError: 'No channel columns found. Add at least one spend column.' }
   }

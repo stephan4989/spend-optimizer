@@ -96,6 +96,18 @@ export function StepConfigure({ upload, onComplete }: Props) {
         </p>
       </div>
 
+      {Object.keys(upload.column_renames ?? {}).length > 0 && (
+        <div className="mb-5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          <span className="font-medium">Columns were automatically renamed</span> to match the required format:{' '}
+          {Object.entries(upload.column_renames).map(([from, to], i) => (
+            <span key={from}>
+              {i > 0 && ', '}
+              <span className="font-mono">{from}</span> → <span className="font-mono">{to}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
       {error && (
         <div className="mb-5">
           <ErrorBanner message={error} onDismiss={() => setError(null)} />

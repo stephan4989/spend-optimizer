@@ -52,10 +52,13 @@ async def upload_csv(
         channels=validated.channels,
         channel_count=len(validated.channels),
         total_spend_per_channel=validated.total_spend_per_channel,
+        column_renames=validated.column_renames,
         raw_csv_key="",
     )
     record.raw_csv_key = f"upload:{record.upload_id}:raw"
-    await upload_repo.save(record, raw_bytes)
+    # Store the normalised CSV (with remapped columns) so the model receives clean data
+    normalised_bytes = validated.df.to_csv(index=False).encode()
+    await upload_repo.save(record, normalised_bytes)
 
     return UploadResponse(
         upload_id=record.upload_id,
@@ -66,4 +69,5 @@ async def upload_csv(
         channels=record.channels,
         channel_count=record.channel_count,
         total_spend_per_channel=record.total_spend_per_channel,
+        column_renames=record.column_renames,
     )

@@ -30,6 +30,22 @@ DATE_COLUMN_ALIASES = {"date", "week", "month"}
 REQUIRED_FIXED = {"acquisitions"}
 MAX_CHANNELS = 10
 
+# Known aliases for the date column (case-insensitive)
+DATE_COLUMN_ALIAS_MAP: dict[str, str] = {
+    "week": "date",
+    "month": "date",
+    "date": "date",
+    "Week": "date",
+    "Month": "date",
+    "Date": "date",
+}
+
+# Known aliases for the KPI / acquisitions column (case-insensitive lookup)
+KPI_ALIASES = {
+    "sales", "revenue", "conversions", "orders", "leads",
+    "purchases", "transactions", "signups", "installs",
+}
+
 # Minimum rows per granularity
 MIN_ROWS: dict[str, int] = {
     "daily":   60,
@@ -48,6 +64,7 @@ class ValidatedCSV:
     granularity: str       # 'daily' | 'weekly' | 'monthly'
     date_col: str          # actual column name used ('date', 'week', or 'month')
     total_spend_per_channel: dict[str, float]
+    column_renames: dict[str, str]  # original → normalised name, for user display
 
 
 def _detect_granularity(dates: pd.Series) -> str:
@@ -121,7 +138,32 @@ def validate_csv(raw_bytes: bytes, filename: str = "") -> ValidatedCSV:
     except Exception as exc:
         _fail(f"Could not parse '{filename}' as CSV: {exc}")
 
-    # --- find date column ---
+    column_renames: dict[str, str] = {}
+
+    # --- normalise column names: strip whitespace, apply known aliases ---
+    # Build a case-insensitive lookup for date and KPI aliases
+    col_lower = {c.lower().strip(): c for c in df.columns}
+
+    # Remap date column
+    date_col_original = None
+    for candidate in ["date", "week", "month"]:
+        if candidate in col_lower:
+            date_col_original = col_lower[candidate]
+            break
+    if date_col_original and date_col_original != "date":
+        df = df.rename(columns={date_col_original: "date"})
+        column_renames[date_col_original] = "date"
+
+    # Remap KPI column if not already named 'acquisitions'
+    if "acquisitions" not in df.columns:
+        for alias in KPI_ALIASES:
+            if alias in col_lower:
+                original = col_lower[alias]
+                df = df.rename(columns={original: "acquisitions"})
+                column_renames[original] = "acquisitions"
+                break
+
+    # --- find date column (after remapping) ---
     date_col = None
     for alias in DATE_COLUMN_ALIASES:
         if alias in df.columns:
@@ -136,7 +178,8 @@ def validate_csv(raw_bytes: bytes, filename: str = "") -> ValidatedCSV:
     # --- required fixed columns ---
     if "acquisitions" not in df.columns:
         _fail(
-            f"Missing required column 'acquisitions'. "
+            "Missing required column 'acquisitions' (or a recognised alias: "
+            f"{', '.join(sorted(KPI_ALIASES))}). "
             f"Found columns: {list(df.columns)}"
         )
 
@@ -214,6 +257,7 @@ def validate_csv(raw_bytes: bytes, filename: str = "") -> ValidatedCSV:
         granularity=granularity,
         date_col=date_col,
         total_spend_per_channel=total_spend,
+        column_renames=column_renames,
     )
 
 
