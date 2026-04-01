@@ -12,8 +12,6 @@ from __future__ import annotations
 
 import io
 import logging
-import multiprocessing
-import os
 
 import pandas as pd
 
@@ -21,8 +19,12 @@ from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
-# Use 'spawn' so the child starts clean (no inherited JAX state from previous runs)
-_MP_CTX = multiprocessing.get_context("spawn")
+# billiard is Celery's own multiprocessing fork — unlike stdlib multiprocessing
+# it allows daemon Celery workers to spawn child processes.
+# Use 'spawn' so the child starts with a clean Python interpreter (no inherited
+# JAX/XLA state from previous fits).
+import billiard
+_MP_CTX = billiard.context.SpawnContext()
 
 
 def _run_pipeline(payload: dict, redis_url: str, session_ttl: int) -> None:
