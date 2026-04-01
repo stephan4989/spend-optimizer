@@ -92,7 +92,7 @@ def fit_model(self, payload: dict) -> None:
 
         response_curves = extract_response_curves(fit_result)
 
-        fit_data_raw = extract_model_fit(fit_result.mmm, df, fit_result.kpi_scale)
+        fit_data_raw = extract_model_fit(df, fit_result)
         model_fit = ModelFitData(**fit_data_raw)
 
         contrib_raw = extract_channel_contributions(df, fit_result)

@@ -53,9 +53,9 @@ export interface RunListResponse {
 }
 
 export const DEFAULT_MERIDIAN_CONFIG: MeridianConfig = {
-  n_chains: 2,
+  n_chains: 1,
   n_warmup: 500,
-  n_samples: 200,
+  n_samples: 100,
   roi_mu: null,
   roi_sigma: null,
 }

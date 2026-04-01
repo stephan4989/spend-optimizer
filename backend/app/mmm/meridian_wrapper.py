@@ -267,16 +267,7 @@ class MeridianWrapper:
         if progress_callback:
             progress_callback(75)
 
-        logger.info("Sampling complete. Running posterior predictive check.")
-        try:
-            mmm.sample_posterior_predictive(
-                n_chains=self.config.n_chains,
-                n_keep=self.config.n_samples,
-            )
-        except Exception as exc:
-            logger.warning("sample_posterior_predictive failed (%s) — fit chart will fall back.", exc)
-
-        logger.info("Extracting posterior samples.")
+        logger.info("Sampling complete. Extracting posterior samples.")
         posterior = _extract_posterior(mmm, channel_names)
         r_hat_max, ess_bulk_min = _compute_diagnostics(mmm)
 
