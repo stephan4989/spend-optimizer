@@ -33,6 +33,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=1
+    restart: always
     env_file: ./backend/.env
     environment:
       - REDIS_URL=redis://redis:6379/0
