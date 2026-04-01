@@ -16,6 +16,21 @@ class ModelDiagnostics(BaseModel):
     waic: float | None = None
 
 
+class ModelFitData(BaseModel):
+    """Actual KPI vs model posterior-predictive mean + credible interval."""
+    dates: list[str]
+    actual: list[float]
+    predicted_mean: list[float]
+    predicted_lower: list[float]   # 10th percentile
+    predicted_upper: list[float]   # 90th percentile
+
+
+class ContributionData(BaseModel):
+    """Per-channel media contributions over time (time-series adstock)."""
+    dates: list[str]
+    contributions: dict[str, list[float]]   # channel → per-period values
+
+
 class RunResults(BaseModel):
     run_id: str
     run_label: str
@@ -29,3 +44,6 @@ class RunResults(BaseModel):
     model_diagnostics: ModelDiagnostics
     planning_period_label: str = "Quarterly"
     n_periods: int = 13
+    # Time-series analytics — optional so existing serialised results still load
+    model_fit: ModelFitData | None = None
+    contributions: ContributionData | None = None

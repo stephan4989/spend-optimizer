@@ -11,6 +11,19 @@ export interface ModelDiagnostics {
   waic: number | null
 }
 
+export interface ModelFitData {
+  dates: string[]
+  actual: number[]
+  predicted_mean: number[]
+  predicted_lower: number[]
+  predicted_upper: number[]
+}
+
+export interface ContributionData {
+  dates: string[]
+  contributions: Record<string, number[]>
+}
+
 export interface ScenarioResult {
   total_budget: number
   optimized_allocation: Record<string, number>
@@ -32,4 +45,6 @@ export interface RunResults {
   model_diagnostics: ModelDiagnostics
   planning_period_label: string
   n_periods: number
+  model_fit: ModelFitData | null
+  contributions: ContributionData | null
 }

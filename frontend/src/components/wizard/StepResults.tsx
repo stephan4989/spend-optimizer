@@ -3,6 +3,9 @@ import type { RunSummary } from '@/types/run'
 import { RunStatusBadge } from '@/components/runs/RunStatusBadge'
 import { ResponseCurveChart } from '@/components/charts/ResponseCurveChart'
 import { BudgetAllocationChart } from '@/components/charts/BudgetAllocationChart'
+import { ModelFitChart } from '@/components/charts/ModelFitChart'
+import { ContributionChart } from '@/components/charts/ContributionChart'
+import { MetricTooltip } from '@/components/common/MetricTooltip'
 import { ScenarioPanel } from '@/components/wizard/ScenarioPanel'
 
 interface Props {
@@ -149,9 +152,43 @@ export function StepResults({ run, results }: Props) {
         </div>
       </div>
 
-      {/* Response curves */}
+      {/* ── 1. Model Fit ──────────────────────────────────────────────── */}
       <div>
-        <h3 className="mb-3 text-sm font-semibold text-gray-800">Response curves</h3>
+        <h3 className="mb-1 flex items-center text-sm font-semibold text-gray-800">
+          Model fit — actual vs predicted
+          <MetricTooltip text="The model is re-run through the training data using the posterior parameter estimates. 'Actual' is the observed KPI; 'Predicted' is the posterior mean. The shaded band is the 80% credible interval — if the model fits well, ~80% of actual values should fall inside it." />
+        </h3>
+        <p className="mb-3 text-xs text-gray-400">How well the model tracks historical acquisitions</p>
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          {results.model_fit
+            ? <ModelFitChart data={results.model_fit} />
+            : <p className="py-8 text-center text-xs text-gray-400">Model fit data not available for this run.</p>
+          }
+        </div>
+      </div>
+
+      {/* ── 2. Channel Contributions ───────────────────────────────── */}
+      <div>
+        <h3 className="mb-1 flex items-center text-sm font-semibold text-gray-800">
+          Channel contribution breakdown
+          <MetricTooltip text="Media-attributed acquisitions per channel per period, computed using time-series geometric adstock. Each channel's contribution is the Hill-saturation output scaled by its posterior beta coefficient. The baseline (organic traffic, seasonality, trend) is excluded — contributions shown here are the marginal effect of paid media spend." />
+        </h3>
+        <p className="mb-3 text-xs text-gray-400">Acquisitions attributed to each channel over time</p>
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          {results.contributions
+            ? <ContributionChart data={results.contributions} channels={results.channels} />
+            : <p className="py-8 text-center text-xs text-gray-400">Contribution data not available for this run.</p>
+          }
+        </div>
+      </div>
+
+      {/* ── 3. Response Curves ─────────────────────────────────────── */}
+      <div>
+        <h3 className="mb-1 flex items-center text-sm font-semibold text-gray-800">
+          Response curves
+          <MetricTooltip text="Spend vs expected acquisitions for each channel, evaluated at steady-state using the Hill-Adstock model. The x-axis is weekly spend; the y-axis is incremental acquisitions expected at that spend level. Shaded bands show the 80% credible interval across posterior samples. Dots mark the current (prior) spend level for each channel." />
+        </h3>
+        <p className="mb-3 text-xs text-gray-400">Diminishing returns — how each channel converts spend to acquisitions</p>
         <div className="rounded-xl border border-gray-200 bg-white p-4">
           <ResponseCurveChart results={results} />
         </div>
@@ -168,17 +205,41 @@ export function StepResults({ run, results }: Props) {
       {/* Budget scenario */}
       <ScenarioPanel run_id={results.run_id} results={results} />
 
-      {/* Model diagnostics */}
+      {/* ── Model diagnostics ─────────────────────────────────────── */}
       <div>
-        <h3 className="mb-3 text-sm font-semibold text-gray-800">Model diagnostics</h3>
+        <h3 className="mb-3 flex items-center text-sm font-semibold text-gray-800">
+          Model diagnostics
+          <MetricTooltip text="MCMC convergence and sample quality metrics. R-hat measures chain mixing — values < 1.1 indicate the chains have converged. ESS (effective sample size) measures how many independent samples the chains are equivalent to — higher is better. WAIC (Widely Applicable Information Criterion) measures out-of-sample predictive accuracy relative to other runs of the same model — lower is better." />
+        </h3>
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: 'R-hat max', value: results.model_diagnostics.r_hat_max.toFixed(3), good: results.model_diagnostics.r_hat_max < 1.1, hint: '< 1.1 = good convergence' },
-            { label: 'ESS bulk min', value: fmt(results.model_diagnostics.ess_bulk_min), good: results.model_diagnostics.ess_bulk_min > 400, hint: '> 400 = sufficient samples' },
-            { label: 'WAIC', value: results.model_diagnostics.waic != null ? results.model_diagnostics.waic.toFixed(1) : 'N/A', good: null, hint: 'Lower is better' },
-          ].map(({ label, value, good, hint }) => (
+            {
+              label: 'R-hat max',
+              value: results.model_diagnostics.r_hat_max.toFixed(3),
+              good: results.model_diagnostics.r_hat_max < 1.1,
+              hint: '< 1.1 = good convergence',
+              tooltip: 'Gelman-Rubin convergence diagnostic. Compares within-chain to between-chain variance. Values close to 1.0 mean all chains converged to the same posterior. Values > 1.1 suggest divergence — increase warmup steps or check the data.',
+            },
+            {
+              label: 'ESS bulk min',
+              value: fmt(results.model_diagnostics.ess_bulk_min),
+              good: results.model_diagnostics.ess_bulk_min > 400,
+              hint: '> 400 = sufficient samples',
+              tooltip: 'Effective Sample Size for the bulk of the posterior distribution. Accounts for autocorrelation between MCMC draws. Low ESS (< 400) means the sampler is exploring slowly — increase n_samples or reduce model complexity.',
+            },
+            {
+              label: 'WAIC',
+              value: results.model_diagnostics.waic != null ? results.model_diagnostics.waic.toFixed(1) : 'N/A',
+              good: null,
+              hint: 'Lower is better',
+              tooltip: 'Widely Applicable Information Criterion — a Bayesian measure of out-of-sample predictive accuracy, penalised for model complexity. Use this to compare different channel configurations or prior settings for the same dataset. Lower values indicate better predictive performance.',
+            },
+          ].map(({ label, value, good, hint, tooltip }) => (
             <div key={label} className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-              <p className="text-xs text-gray-500">{label}</p>
+              <p className="flex items-center text-xs text-gray-500">
+                {label}
+                <MetricTooltip text={tooltip} />
+              </p>
               <p className={`mt-1 text-lg font-bold ${good === true ? 'text-green-600' : good === false ? 'text-amber-600' : 'text-gray-800'}`}>
                 {value}
               </p>

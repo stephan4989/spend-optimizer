@@ -84,10 +84,19 @@ def fit_model(self, payload: dict) -> None:
         )
         logger.info("fit_model[%s]: model fitted. r_hat_max=%.3f", run_id, fit_result.r_hat_max)
 
-        # ── Phase 3: response curves ──────────────────────────────────────
+        # ── Phase 3: response curves + time-series analytics ─────────────
         progress(82)
         from app.mmm.response_curves import extract_response_curves
+        from app.mmm.model_analytics import extract_model_fit, extract_channel_contributions
+        from app.models.results import ModelFitData, ContributionData
+
         response_curves = extract_response_curves(fit_result)
+
+        fit_data_raw = extract_model_fit(fit_result.mmm, df, fit_result.kpi_scale)
+        model_fit = ModelFitData(**fit_data_raw)
+
+        contrib_raw = extract_channel_contributions(df, fit_result)
+        contributions = ContributionData(**contrib_raw)
 
         # ── Phase 4: budget optimisation ──────────────────────────────────
         progress(88, RunStatus.optimizing)
@@ -128,6 +137,8 @@ def fit_model(self, payload: dict) -> None:
             ),
             planning_period_label=planning_period_label,
             n_periods=n_periods,
+            model_fit=model_fit,
+            contributions=contributions,
         )
         run_repo.save_results(run_id, results)
         run_repo.update_status(run_id, RunStatus.completed, progress_pct=100)

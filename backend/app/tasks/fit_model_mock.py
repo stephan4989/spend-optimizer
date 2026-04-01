@@ -44,7 +44,7 @@ def fit_model(self, payload: dict) -> None:
     import redis as sync_redis
     from app.config import get_settings
     from app.models.run import RunStatus
-    from app.models.results import ModelDiagnostics, RunResults, ResponseCurveData
+    from app.models.results import ModelDiagnostics, ModelFitData, ContributionData, RunResults, ResponseCurveData
 
     settings = get_settings()
     r = sync_redis.from_url(settings.REDIS_URL, decode_responses=False)
@@ -159,6 +159,48 @@ def fit_model(self, payload: dict) -> None:
         opt_acq = total_acq(optimized_allocation)
         lift_pct = round((opt_acq - prior_acq) / max(prior_acq, 1) * 100, 2)
 
+        # ── Synthetic time-series analytics ───────────────────────────────
+        n_rows = len(df) if df is not None else 52
+        dates: list[str] = []
+        if df is not None and "date" in df.columns:
+            dates = df["date"].astype(str).tolist()
+        else:
+            import datetime
+            base = datetime.date(2023, 1, 2)
+            dates = [(base + datetime.timedelta(weeks=w)).isoformat() for w in range(n_rows)]
+
+        # Actual acquisitions: sinusoidal seasonal pattern
+        actual_acq = [
+            round(prior_acq * (0.85 + 0.3 * math.sin(2 * math.pi * t / 52) + rng.uniform(-0.08, 0.08)), 1)
+            for t in range(n_rows)
+        ]
+        if df is not None and "acquisitions" in df.columns:
+            actual_acq = df["acquisitions"].tolist()
+
+        # Predicted ≈ actual ± small noise, CI wider
+        predicted_mean = [round(a * rng.uniform(0.95, 1.05), 1) for a in actual_acq]
+        predicted_lower = [round(p * 0.88, 1) for p in predicted_mean]
+        predicted_upper = [round(p * 1.12, 1) for p in predicted_mean]
+
+        model_fit = ModelFitData(
+            dates=dates,
+            actual=actual_acq,
+            predicted_mean=predicted_mean,
+            predicted_lower=predicted_lower,
+            predicted_upper=predicted_upper,
+        )
+
+        # Channel contributions: each channel gets a noisy fraction of actual
+        total_roi = sum(roi.values())
+        contrib_dict: dict[str, list[float]] = {}
+        for ch in channel_names:
+            ch_share = roi[ch] / total_roi
+            contrib_dict[ch] = [
+                round(a * ch_share * rng.uniform(0.85, 1.15), 1) for a in actual_acq
+            ]
+
+        contributions = ContributionData(dates=dates, contributions=contrib_dict)
+
         results = RunResults(
             run_id=run_id,
             run_label=run_label,
@@ -174,6 +216,8 @@ def fit_model(self, payload: dict) -> None:
                 ess_bulk_min=round(rng.uniform(450, 1200)),
                 waic=round(rng.uniform(-4500, -3000), 1),
             ),
+            model_fit=model_fit,
+            contributions=contributions,
         )
 
         run_repo.save_results(run_id, results)
