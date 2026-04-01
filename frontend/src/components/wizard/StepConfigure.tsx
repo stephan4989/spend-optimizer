@@ -220,6 +220,14 @@ export function StepConfigure({ upload, onComplete }: Props) {
               </span>
               <span>Historical avg: {formatCurrency(meanPeriodSpend * periodOptions[periodIdx].periods)}</span>
             </div>
+            {(() => {
+              const perPeriodBudget = (parseFloat(totalBudget) || 0) / periodOptions[periodIdx].periods
+              return perPeriodBudget > meanPeriodSpend * 3 ? (
+                <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Per-period budget ({formatCurrency(perPeriodBudget)}) is more than 3× the historical average ({formatCurrency(meanPeriodSpend)}). The model has no data at this spend level — results may be unreliable.
+                </div>
+              ) : null
+            })()}
           </div>
         </div>
 

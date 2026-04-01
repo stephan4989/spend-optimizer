@@ -117,9 +117,18 @@ export function RunsSidebar() {
       </nav>
 
       {/* Session info footer */}
-      <div className="border-t border-gray-200 px-4 py-3">
+      <div className="border-t border-gray-200 px-4 py-3 space-y-2">
         <p className="text-xs text-gray-400">Session expires in ~4 hrs</p>
         <p className="text-xs text-gray-400">Data is not stored permanently.</p>
+        <button
+          onClick={() => {
+            useSessionStore.getState().clearSession()
+            window.location.reload()
+          }}
+          className="text-xs text-gray-400 underline hover:text-gray-600 transition-colors"
+        >
+          Reset session
+        </button>
       </div>
     </aside>
   )

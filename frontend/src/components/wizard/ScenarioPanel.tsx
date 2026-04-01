@@ -34,9 +34,15 @@ export function ScenarioPanel({ run_id, results }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Slider range: 25% → 200% of original budget
+  // Max spend the model was trained on (sum of each channel's top spend_point)
+  const curveMax = results.channels.reduce((sum, ch) => {
+    const pts = results.response_curves[ch]?.spend_points ?? []
+    return sum + (pts[pts.length - 1] ?? 0)
+  }, 0)
+
+  // Slider range: 25% → min(200% of original, curveMax)
   const sliderMin = Math.round(originalBudget * 0.25)
-  const sliderMax = Math.round(originalBudget * 2.0)
+  const sliderMax = curveMax > 0 ? Math.round(Math.min(originalBudget * 2.0, curveMax)) : Math.round(originalBudget * 2.0)
 
   async function handleRun() {
     const b = parseFloat(inputValue)
@@ -104,6 +110,12 @@ export function ScenarioPanel({ run_id, results }: Props) {
           <span>{fmtCurrency(sliderMax)}</span>
         </div>
       </div>
+
+      {curveMax > 0 && (parseFloat(inputValue) || 0) > curveMax && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Budget ({fmtCurrency(parseFloat(inputValue) || 0)}) exceeds the modelled spend range ({fmtCurrency(curveMax)}). Optimizer results will be extrapolated and may be unreliable.
+        </div>
+      )}
 
       {error && <p className="text-xs text-red-600">{error}</p>}
 
