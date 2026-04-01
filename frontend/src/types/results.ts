@@ -22,7 +22,7 @@ export interface ModelFitData {
 export interface ContributionData {
   dates: string[]
   contributions: Record<string, number[]>
-  baseline: number[]
+  baseline: number[]   // empty for runs created before this field was added
 }
 
 export interface ScenarioResult {
