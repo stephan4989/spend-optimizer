@@ -29,6 +29,7 @@ class ContributionData(BaseModel):
     """Per-channel media contributions over time (time-series adstock)."""
     dates: list[str]
     contributions: dict[str, list[float]]   # channel → per-period values
+    baseline: list[float]                   # actual - sum(channel_contributions), floored at 0
 
 
 class RunResults(BaseModel):

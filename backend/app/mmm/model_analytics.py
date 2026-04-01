@@ -108,4 +108,12 @@ def extract_channel_contributions(
         contrib = beta[:, np.newaxis] * hill * fit_result.kpi_scale
         contributions[ch] = contrib.mean(axis=0).tolist()
 
-    return {"dates": dates, "contributions": contributions}
+    # Baseline = actual KPI minus the sum of all channel contributions, floored at 0.
+    # This captures intercept, trend, seasonality — everything not attributed to paid media.
+    actual = df["acquisitions"].to_numpy(dtype=float)
+    total_media = np.zeros(n_times)
+    for ch_contrib in contributions.values():
+        total_media += np.array(ch_contrib)
+    baseline = np.maximum(actual - total_media, 0.0).tolist()
+
+    return {"dates": dates, "contributions": contributions, "baseline": baseline}

@@ -22,6 +22,7 @@ export interface ModelFitData {
 export interface ContributionData {
   dates: string[]
   contributions: Record<string, number[]>
+  baseline: number[]
 }
 
 export interface ScenarioResult {

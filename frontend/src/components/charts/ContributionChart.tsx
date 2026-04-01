@@ -11,56 +11,79 @@ const PALETTE = [
   '#2563eb', '#16a34a', '#dc2626', '#d97706', '#7c3aed',
   '#0891b2', '#be185d', '#65a30d', '#ea580c', '#4338ca',
 ]
+const BASELINE_COLOR = '#9ca3af'
 
 export function ContributionChart({ data, channels }: Props) {
-  const [activeChannel, setActiveChannel] = useState<string | null>(null)
+  const [showPct, setShowPct] = useState(false)
+
+  // Compute totals per time step for percentage normalisation
+  const totals = useMemo(() => {
+    return data.dates.map((_, t) => {
+      const mediaSum = channels.reduce((s, ch) => s + (data.contributions[ch]?.[t] ?? 0), 0)
+      return mediaSum + (data.baseline[t] ?? 0)
+    })
+  }, [data, channels])
 
   const traces = useMemo((): Plotly.Data[] => {
-    return channels.map((ch, i) => {
+    const normalise = (val: number, t: number) =>
+      showPct ? (totals[t] > 0 ? (val / totals[t]) * 100 : 0) : val
+
+    const out: Plotly.Data[] = []
+
+    // Baseline first so it sits at the bottom of the stack
+    out.push({
+      x: data.dates,
+      y: data.baseline.map((v, t) => normalise(v, t)),
+      type: 'scatter',
+      mode: 'lines',
+      stackgroup: 'one',
+      name: 'Baseline',
+      line: { width: 0 },
+      fillcolor: BASELINE_COLOR,
+      hovertemplate: showPct
+        ? '<b>Baseline</b><br>%{x}<br>%{y:.1f}%<extra></extra>'
+        : '<b>Baseline</b><br>%{x}<br>%{y:,.0f} acq<extra></extra>',
+    } as Plotly.Data)
+
+    // Channels stacked on top
+    channels.forEach((ch, i) => {
       const color = PALETTE[i % PALETTE.length]
-      const isActive = activeChannel === null || activeChannel === ch
-      return {
+      out.push({
         x: data.dates,
-        y: data.contributions[ch] ?? [],
+        y: (data.contributions[ch] ?? []).map((v, t) => normalise(v, t)),
         type: 'scatter',
         mode: 'lines',
         stackgroup: 'one',
         name: ch,
-        line: { color, width: 0 },
-        fillcolor: isActive ? color : `${color}33`,
-        opacity: isActive ? 0.85 : 0.25,
-        hovertemplate: `<b>${ch}</b><br>%{x}<br>%{y:,.0f} acq<extra></extra>`,
-      } as Plotly.Data
+        line: { width: 0 },
+        fillcolor: color,
+        hovertemplate: showPct
+          ? `<b>${ch}</b><br>%{x}<br>%{y:.1f}%<extra></extra>`
+          : `<b>${ch}</b><br>%{x}<br>%{y:,.0f} acq<extra></extra>`,
+      } as Plotly.Data)
     })
-  }, [data, channels, activeChannel])
+
+    return out
+  }, [data, channels, showPct, totals])
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap gap-2">
-        <button
-          onClick={() => setActiveChannel(null)}
-          className={`rounded-full px-3 py-0.5 text-xs font-medium border transition-colors ${
-            activeChannel === null
-              ? 'bg-gray-900 border-gray-900 text-white'
-              : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
-          }`}
-        >
-          All
-        </button>
-        {channels.map((ch, i) => (
+      {/* Toggle */}
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-1 rounded-lg border border-gray-200 p-0.5 text-xs">
           <button
-            key={ch}
-            onClick={() => setActiveChannel(activeChannel === ch ? null : ch)}
-            className="rounded-full px-3 py-0.5 text-xs font-medium border transition-colors"
-            style={
-              activeChannel === ch
-                ? { backgroundColor: PALETTE[i % PALETTE.length], borderColor: PALETTE[i % PALETTE.length], color: 'white' }
-                : { backgroundColor: 'white', borderColor: '#d1d5db', color: '#4b5563' }
-            }
+            onClick={() => setShowPct(false)}
+            className={`rounded-md px-3 py-1 font-medium transition-colors ${!showPct ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-700'}`}
           >
-            {ch}
+            Absolute
           </button>
-        ))}
+          <button
+            onClick={() => setShowPct(true)}
+            className={`rounded-md px-3 py-1 font-medium transition-colors ${showPct ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            % share
+          </button>
+        </div>
       </div>
 
       <Plot
@@ -76,23 +99,24 @@ export function ContributionChart({ data, channels }: Props) {
             zeroline: false,
           },
           yaxis: {
-            title: { text: 'Acquisitions attributed', font: { size: 12 } },
-            tickformat: ',.0f',
+            title: { text: showPct ? 'Share (%)' : 'Acquisitions attributed', font: { size: 12 } },
+            tickformat: showPct ? '.0f' : ',.0f',
+            ticksuffix: showPct ? '%' : '',
             gridcolor: '#f3f4f6',
             zeroline: false,
+            range: showPct ? [0, 100] : undefined,
           },
           legend: { orientation: 'h', y: -0.2, x: 0, font: { size: 11 } },
           plot_bgcolor: 'white',
           paper_bgcolor: 'white',
           hovermode: 'x unified',
-          barmode: 'stack',
         }}
         config={{ displayModeBar: false, responsive: true }}
         style={{ width: '100%' }}
         useResizeHandler
       />
       <p className="text-center text-xs text-gray-400 -mt-2">
-        Media-attributed acquisitions only · baseline (organic + trend) excluded
+        Baseline = organic, trend &amp; seasonality · Media contributions use time-series adstock
       </p>
     </div>
   )

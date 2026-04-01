@@ -177,8 +177,12 @@ def fit_model(self, payload: dict) -> None:
         if df is not None and "acquisitions" in df.columns:
             actual_acq = df["acquisitions"].tolist()
 
-        # Predicted ≈ actual ± small noise, CI wider
-        predicted_mean = [round(a * rng.uniform(0.95, 1.05), 1) for a in actual_acq]
+        # Predicted: smooth sinusoidal trend (what the model actually captures),
+        # deliberately different from noisy actual so the chart is meaningful
+        predicted_mean = [
+            round(prior_acq * (0.85 + 0.3 * math.sin(2 * math.pi * t / 52)), 1)
+            for t in range(n_rows)
+        ]
         predicted_lower = [round(p * 0.88, 1) for p in predicted_mean]
         predicted_upper = [round(p * 1.12, 1) for p in predicted_mean]
 
@@ -190,16 +194,24 @@ def fit_model(self, payload: dict) -> None:
             predicted_upper=predicted_upper,
         )
 
-        # Channel contributions: each channel gets a noisy fraction of actual
+        # Channel contributions: media accounts for ~60% of acquisitions; rest is baseline
         total_roi = sum(roi.values())
+        media_share = 0.60
         contrib_dict: dict[str, list[float]] = {}
         for ch in channel_names:
             ch_share = roi[ch] / total_roi
             contrib_dict[ch] = [
-                round(a * ch_share * rng.uniform(0.85, 1.15), 1) for a in actual_acq
+                round(a * media_share * ch_share * rng.uniform(0.85, 1.15), 1)
+                for a in actual_acq
             ]
 
-        contributions = ContributionData(dates=dates, contributions=contrib_dict)
+        # Baseline = remaining ~40% of acquisitions not attributed to paid media
+        baseline = [
+            round(max(a - sum(contrib_dict[ch][t] for ch in channel_names), 0), 1)
+            for t, a in enumerate(actual_acq)
+        ]
+
+        contributions = ContributionData(dates=dates, contributions=contrib_dict, baseline=baseline)
 
         results = RunResults(
             run_id=run_id,
