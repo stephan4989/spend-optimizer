@@ -24,10 +24,12 @@ export interface RunResults {
   run_label: string
   channels: string[]
   response_curves: Record<string, ResponseCurveData>
-  prior_allocation: Record<string, number>
-  optimized_allocation: Record<string, number>
+  prior_allocation: Record<string, number>       // per-period spend
+  optimized_allocation: Record<string, number>   // per-period spend
   prior_total_acquisitions: number
   optimized_total_acquisitions: number
   lift_pct: number
   model_diagnostics: ModelDiagnostics
+  planning_period_label: string
+  n_periods: number
 }

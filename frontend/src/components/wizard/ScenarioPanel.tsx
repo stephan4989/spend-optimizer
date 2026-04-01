@@ -23,7 +23,10 @@ function fmt(n: number) {
 export function ScenarioPanel({ run_id, results }: Props) {
   const sessionId = useSessionStore((s) => s.sessionId)!
 
-  // Default to the original optimised budget
+  const n = results.n_periods
+  const periodLabel = results.planning_period_label
+
+  // Default to the original optimised budget (per period)
   const originalBudget = Object.values(results.optimized_allocation).reduce((a, b) => a + b, 0)
   const [budget, setBudget] = useState(Math.round(originalBudget))
   const [inputValue, setInputValue] = useState(String(Math.round(originalBudget)))
@@ -58,7 +61,8 @@ export function ScenarioPanel({ run_id, results }: Props) {
       <div>
         <h3 className="text-sm font-semibold text-gray-800">Budget scenario</h3>
         <p className="mt-0.5 text-xs text-gray-500">
-          Adjust the total budget to see how the optimal allocation and estimated acquisitions change — no refitting needed.
+          Adjust the per-period budget to see how optimal allocation changes — no refitting needed.
+          {' '}Results show per-period spend and the {periodLabel.toLowerCase()} total ({n} periods).
         </p>
       </div>
 
@@ -119,8 +123,9 @@ export function ScenarioPanel({ run_id, results }: Props) {
           {/* Summary cards */}
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-lg border border-gray-200 bg-white p-4">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Budget</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Per-period budget</p>
               <p className="mt-1.5 text-xl font-bold text-gray-900">{fmtCurrency(scenario.total_budget)}</p>
+              <p className="text-xs text-gray-400">{periodLabel} total: {fmtCurrency(scenario.total_budget * n)}</p>
             </div>
             <div className="rounded-lg border border-gray-200 bg-white p-4">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Est. acquisitions</p>
@@ -139,7 +144,8 @@ export function ScenarioPanel({ run_id, results }: Props) {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Channel</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Optimised spend</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">/ period</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">{periodLabel} total</th>
                   <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Share</th>
                   <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">vs original run</th>
                 </tr>
@@ -154,6 +160,7 @@ export function ScenarioPanel({ run_id, results }: Props) {
                     <tr key={ch} className="hover:bg-gray-50">
                       <td className="px-4 py-2 font-medium text-gray-900">{ch}</td>
                       <td className="px-4 py-2 text-right text-gray-700">{fmtCurrency(newSpend)}</td>
+                      <td className="px-4 py-2 text-right text-gray-700">{fmtCurrency(newSpend * n)}</td>
                       <td className="px-4 py-2 text-right text-gray-500">{share.toFixed(1)}%</td>
                       <td className={`px-4 py-2 text-right font-medium ${delta >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {delta >= 0 ? '+' : ''}{fmtCurrency(delta)}
@@ -166,6 +173,7 @@ export function ScenarioPanel({ run_id, results }: Props) {
                 <tr>
                   <td className="px-4 py-2 text-xs font-semibold text-gray-600">Total</td>
                   <td className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{fmtCurrency(scenario.total_budget)}</td>
+                  <td className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{fmtCurrency(scenario.total_budget * n)}</td>
                   <td className="px-4 py-2 text-right text-xs text-gray-400">100%</td>
                   <td className="px-4 py-2 text-right text-xs font-semibold text-gray-600">
                     {(() => { const d = scenario.total_budget - originalBudget; return `${d >= 0 ? '+' : ''}${fmtCurrency(d)}` })()}

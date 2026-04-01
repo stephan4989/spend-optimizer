@@ -21,9 +21,11 @@ class RunResults(BaseModel):
     run_label: str
     channels: list[str]
     response_curves: dict[str, ResponseCurveData]
-    prior_allocation: dict[str, float]
-    optimized_allocation: dict[str, float]
+    prior_allocation: dict[str, float]       # per-period spend
+    optimized_allocation: dict[str, float]   # per-period spend
     prior_total_acquisitions: float
     optimized_total_acquisitions: float
     lift_pct: float
     model_diagnostics: ModelDiagnostics
+    planning_period_label: str = "Quarterly"
+    n_periods: int = 13

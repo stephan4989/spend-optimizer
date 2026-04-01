@@ -43,7 +43,9 @@ class MeridianConfig(BaseModel):
 class RunCreate(BaseModel):
     upload_id: str
     run_label: str
-    total_budget: float
+    total_budget: float          # per-period budget (week / day / month)
+    planning_period_label: str = "Quarterly"   # e.g. "Quarterly", "Annual"
+    n_periods: int = 13          # number of data periods in the planning window
     # If omitted, all channels from the upload are used
     channel_names: list[str] | None = None
     channel_constraints: dict[str, ChannelConstraint] = Field(default_factory=dict)
@@ -65,7 +67,9 @@ class RunRecord(BaseModel):
     progress_pct: int = 0
     error_message: str | None = None
     celery_task_id: str | None = None
-    total_budget: float
+    total_budget: float          # per-period budget
+    planning_period_label: str = "Quarterly"
+    n_periods: int = 13
     channel_constraints: dict[str, ChannelConstraint] = Field(default_factory=dict)
     meridian_config: MeridianConfig = Field(default_factory=MeridianConfig)
 

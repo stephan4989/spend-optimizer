@@ -44,6 +44,7 @@ export function StepResults({ run, results }: Props) {
   const liftPositive = results.lift_pct >= 0
   const totalPrior = Object.values(results.prior_allocation).reduce((a, b) => a + b, 0)
   const totalOptimized = Object.values(results.optimized_allocation).reduce((a, b) => a + b, 0)
+  const n = results.n_periods
 
   return (
     <div className="mx-auto max-w-3xl px-8 py-10 space-y-8">
@@ -52,10 +53,23 @@ export function StepResults({ run, results }: Props) {
         <div>
           <h2 className="text-xl font-semibold text-gray-900">{results.run_label}</h2>
           <p className="mt-1 text-sm text-gray-500">
-            {results.channels.length} channels · Optimisation complete
+            {results.channels.length} channels · {results.planning_period_label} plan ({results.n_periods} periods) · Optimisation complete
           </p>
         </div>
         <RunStatusBadge status="completed" />
+      </div>
+
+      {/* Planning period budget summary */}
+      <div className="rounded-xl border border-brand-200 bg-brand-50 px-5 py-4 flex items-center justify-between">
+        <div>
+          <p className="text-xs font-medium text-brand-700 uppercase tracking-wide">{results.planning_period_label} budget</p>
+          <p className="mt-1 text-2xl font-bold text-brand-900">{fmtCurrency(totalOptimized * n)}</p>
+          <p className="mt-0.5 text-xs text-brand-600">{fmtCurrency(totalOptimized)} per period × {n} periods</p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-brand-600">Prior mix total</p>
+          <p className="text-lg font-semibold text-brand-800">{fmtCurrency(totalPrior * n)}</p>
+        </div>
       </div>
 
       {/* Lift summary cards */}
@@ -63,12 +77,12 @@ export function StepResults({ run, results }: Props) {
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Prior acquisitions</p>
           <p className="mt-2 text-2xl font-bold text-gray-900">{fmt(results.prior_total_acquisitions)}</p>
-          <p className="mt-0.5 text-xs text-gray-400">at prior allocation</p>
+          <p className="mt-0.5 text-xs text-gray-400">per period at prior mix</p>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Optimised acquisitions</p>
           <p className="mt-2 text-2xl font-bold text-gray-900">{fmt(results.optimized_total_acquisitions)}</p>
-          <p className="mt-0.5 text-xs text-gray-400">at optimised allocation</p>
+          <p className="mt-0.5 text-xs text-gray-400">per period at optimised mix</p>
         </div>
         <div className={`rounded-xl border p-5 ${liftPositive ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
           <p className={`text-xs font-medium uppercase tracking-wide ${liftPositive ? 'text-green-600' : 'text-red-600'}`}>Estimated lift</p>
@@ -90,10 +104,11 @@ export function StepResults({ run, results }: Props) {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">Channel</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Prior spend / period</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Prior / period</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Prior share</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Optimised spend / period</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Optimised share</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Optimised / period</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Optimised total</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Share</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wide">Change</th>
               </tr>
             </thead>
@@ -110,6 +125,7 @@ export function StepResults({ run, results }: Props) {
                     <td className="px-4 py-3 text-right text-gray-600">{fmtCurrency(prior)}</td>
                     <td className="px-4 py-3 text-right text-gray-500">{priorShare.toFixed(1)}%</td>
                     <td className="px-4 py-3 text-right font-medium text-gray-900">{fmtCurrency(optimized)}</td>
+                    <td className="px-4 py-3 text-right text-gray-700">{fmtCurrency(optimized * n)}</td>
                     <td className="px-4 py-3 text-right text-gray-500">{optimizedShare.toFixed(1)}%</td>
                     <td className={`px-4 py-3 text-right font-medium ${delta >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {delta >= 0 ? '+' : ''}{fmtCurrency(delta)}
@@ -124,6 +140,7 @@ export function StepResults({ run, results }: Props) {
                 <td className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{fmtCurrency(totalPrior)}</td>
                 <td className="px-4 py-2 text-right text-xs text-gray-400">100%</td>
                 <td className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{fmtCurrency(totalOptimized)}</td>
+                <td className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{fmtCurrency(totalOptimized * n)}</td>
                 <td className="px-4 py-2 text-right text-xs text-gray-400">100%</td>
                 <td className="px-4 py-2" />
               </tr>

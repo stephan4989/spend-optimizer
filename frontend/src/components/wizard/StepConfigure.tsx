@@ -97,6 +97,8 @@ export function StepConfigure({ upload, onComplete }: Props) {
         upload_id: upload.upload_id,
         run_label: runLabel.trim(),
         total_budget: perPeriodBudget,
+        planning_period_label: periodOptions[periodIdx].label,
+        n_periods: nPeriods,
         channel_names: selectedChannels,
         channel_constraints: Object.fromEntries(
           selectedChannels.map((ch) => [ch, constraints[ch] ?? { min_fraction: 0, max_fraction: 1 }])

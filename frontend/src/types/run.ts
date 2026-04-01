@@ -16,7 +16,9 @@ export interface MeridianConfig {
 export interface RunCreateRequest {
   upload_id: string
   run_label: string
-  total_budget: number
+  total_budget: number            // per-period budget
+  planning_period_label: string
+  n_periods: number
   channel_names?: string[]
   channel_constraints: Record<string, ChannelConstraint>
   meridian_config: MeridianConfig

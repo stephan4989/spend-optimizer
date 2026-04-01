@@ -32,6 +32,8 @@ def fit_model(self, payload: dict) -> None:
     upload_id: str = payload["upload_id"]
     channel_names: list[str] = payload["channel_names"]
     total_budget: float = payload["total_budget"]
+    planning_period_label: str = payload.get("planning_period_label", "Quarterly")
+    n_periods: int = payload.get("n_periods", 13)
     channel_constraints_raw: dict = payload.get("channel_constraints", {})
     meridian_config_raw: dict = payload.get("meridian_config", {})
     granularity: str = payload.get("granularity", "weekly")
@@ -124,6 +126,8 @@ def fit_model(self, payload: dict) -> None:
                 r_hat_max=fit_result.r_hat_max,
                 ess_bulk_min=fit_result.ess_bulk_min,
             ),
+            planning_period_label=planning_period_label,
+            n_periods=n_periods,
         )
         run_repo.save_results(run_id, results)
         run_repo.update_status(run_id, RunStatus.completed, progress_pct=100)

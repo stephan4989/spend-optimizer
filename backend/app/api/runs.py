@@ -91,6 +91,8 @@ async def create_run(
         upload_id=body.upload_id,
         run_label=body.run_label,
         total_budget=body.total_budget,
+        planning_period_label=body.planning_period_label,
+        n_periods=body.n_periods,
         channel_constraints=body.channel_constraints,
         meridian_config=body.meridian_config,
     )
@@ -104,6 +106,8 @@ async def create_run(
         "upload_id": body.upload_id,
         "channel_names": channel_names,
         "total_budget": body.total_budget,
+        "planning_period_label": body.planning_period_label,
+        "n_periods": body.n_periods,
         "granularity": upload.granularity,
         "channel_constraints": {
             ch: c.model_dump() for ch, c in body.channel_constraints.items()
