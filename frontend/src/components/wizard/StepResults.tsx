@@ -157,9 +157,9 @@ export function StepResults({ run, results }: Props) {
       <div>
         <h3 className="mb-1 flex items-center text-sm font-semibold text-gray-800">
           Model fit — actual vs predicted
-          <MetricTooltip text="The model is re-run through the training data using the posterior parameter estimates. 'Actual' is the observed KPI; 'Predicted' is the posterior mean. The shaded band is the 80% credible interval — if the model fits well, ~80% of actual values should fall inside it." />
+          <MetricTooltip text="'Predicted' is the posterior mean of total media-attributed acquisitions (Hill-Adstock contributions across all channels). The gap between predicted and actual is the baseline — acquisitions driven by organic traffic, trend, and seasonality. The shaded band is the 80% credible interval across posterior samples." />
         </h3>
-        <p className="mb-3 text-xs text-gray-400">How well the model tracks historical acquisitions</p>
+        <p className="mb-3 text-xs text-gray-400">Media-attributed acquisitions vs actual — gap between lines is baseline (organic, trend, seasonality)</p>
         <div className="rounded-xl border border-gray-200 bg-white p-4">
           {results.model_fit
             ? <ModelFitChart data={results.model_fit} />

@@ -95,24 +95,25 @@ def extract_model_fit(
     """
     Compute actual vs model-predicted time series.
 
-    Predicted = intercept + trend + sum(channel contributions).
+    Predicted = sum of all channel Hill-Adstock contributions (media only).
+    We deliberately exclude tau_g (intercept) here because its KPI-unit scaling
+    is uncertain and adding it on top of channel contributions inflates predictions
+    well above actual. The fit chart is intended to show how well media explains
+    the observed KPI — the gap between predicted and actual is the baseline.
     CI is the 10/90 percentile across posterior samples.
     """
     date_col = "date" if "date" in df.columns else "week"
     dates = df[date_col].astype(str).tolist()
     actual = df["acquisitions"].to_numpy(dtype=float).tolist()
 
-    n_times = len(df)
-    media_contrib = _channel_adstock_contributions(df, fit_result)
-    baseline_contrib = _baseline_contribution(fit_result, n_times)
-    predicted = media_contrib + baseline_contrib  # (n_samples, n_times)
+    media_contrib = _channel_adstock_contributions(df, fit_result)  # (n_samples, n_times)
 
     return {
         "dates": dates,
         "actual": actual,
-        "predicted_mean": predicted.mean(axis=0).tolist(),
-        "predicted_lower": np.percentile(predicted, 10, axis=0).tolist(),
-        "predicted_upper": np.percentile(predicted, 90, axis=0).tolist(),
+        "predicted_mean": media_contrib.mean(axis=0).tolist(),
+        "predicted_lower": np.percentile(media_contrib, 10, axis=0).tolist(),
+        "predicted_upper": np.percentile(media_contrib, 90, axis=0).tolist(),
     }
 
 
@@ -158,8 +159,11 @@ def extract_channel_contributions(
         contrib = beta[:, np.newaxis] * hill * fit_result.kpi_scale
         contributions[ch] = contrib.mean(axis=0).tolist()
 
-    # Baseline: posterior mean of (intercept + trend) — not a residual
-    baseline_samples = _baseline_contribution(fit_result, n_times)
-    baseline = np.maximum(baseline_samples.mean(axis=0), 0.0).tolist()
+    # Baseline = actual - sum(channel contributions), floored at 0.
+    # This ensures contributions + baseline = actual exactly, so the stacked
+    # area chart is always truthful regardless of model fit quality.
+    actual_arr = df["acquisitions"].to_numpy(dtype=float)
+    total_media = sum(np.array(v) for v in contributions.values())
+    baseline = np.maximum(actual_arr - total_media, 0.0).tolist()
 
     return {"dates": dates, "contributions": contributions, "baseline": baseline}
